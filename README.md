@@ -1,10 +1,7 @@
 ## Root age estimation using a Bayesian Brownian bridge
 
 ### Requirements
-The program requires Python v.3 (it has been tested with 3.7 and 3.8) and the following li
-matplotlib
-scipy
-numpy
+The program requires Python v.3 (it has been tested with 3.7 and 3.8) and the following libraries: matplotlib, scipy, numpy.
 
 ### Main commands
 
