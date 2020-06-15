@@ -1,7 +1,10 @@
 ## Root age estimation using a Bayesian Brownian bridge
 
 ### Requirements
-The program requires Python v.3 (it has been tested with 3.7 and 3.8) and the following libraries: matplotlib, scipy, numpy.
+The program requires Python v.3 (it has been tested with 3.7 and 3.8) and the following libraries.
+matplotlib
+scipy
+numpy.
 
 ### Main commands
 
@@ -14,7 +17,7 @@ The program requires Python v.3 (it has been tested with 3.7 and 3.8) and the fo
 
 '-n': type=int, help='n. MCMC iterations (default = 25000)'
 
-'-s': type=int, help='sampling freq (default = 100)'
+'-s': type=int, help='sampling frequency (default = 100)'
 
 '-seed': type=int, help='random seed (default = U[1000,9999])'
 
@@ -31,5 +34,7 @@ python3 rootBBB.py -fossil_data fossil_counts_2.5.txt -div_table family_diversit
 python3 rootBBB.py -sim 10 -seed 9600
 
 ```
-This command will sequentially simulate and analyze 10 datasets. The output files are saved in the same directory as the program and include:
-1. a plot of the simulated trajectory 
+This command will sequentially simulate and analyze 10 datasets. The output files are saved in the same directory as the program and include:  
+1. a plot of the simulated trajectory  
+2. a log file with the posterior samples  
+3. a text file with the summary of true and estimated parameters across all simulations.
