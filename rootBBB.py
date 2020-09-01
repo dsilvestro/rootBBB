@@ -19,6 +19,8 @@ p.add_argument('-plot',     type=int,   help='plot simulated Brownian bridge', d
 p.add_argument('-seed',     type=int,   help='random seed', default = -1)
 p.add_argument('-verbose',  type=int,   help='verbose', default = 1)
 p.add_argument('-sim',      type=int,   help='if >1 run simulations', default = 0)
+p.add_argument('-biased_q', type=int,   help='if 1 set increasing q through time', default = 0)
+p.add_argument('-freq_q0',  type=float, help='frequency of 0-sampling rate', default = 0.1)
 p.add_argument('-clades',   type=int,   help='range of clade to be analyzed', default = [0,0], nargs=2)
 p.add_argument('-outpath',  type=str,   help='path output', default = ".")
 p.add_argument('-clade_name', type=str,   help='', default = "")
@@ -53,6 +55,12 @@ sim_loglinear = 0
 freq_par_updates = args.f
 verbose = args.verbose
 DAbatch = args.DAbatch
+
+# simulation settings
+increasing_q_rates = args.biased_q
+freq_zero_preservation = args.freq_q0
+
+
 
 run_simulations = np.min([1,n_simulations])
 
@@ -357,13 +365,11 @@ def simulate_data(rseed=0):
 		np.random.seed(rseed)
 		
 	true_root = np.random.uniform(10,180)
-	freq_zero_preservation = 0.1
 	log_q_mean = -8.52 # 1/5000 mean Nfossil 
 	log_q_std = 1
 
 	logNobs = np.random.uniform(np.log(100),np.log(20000)) # np.log(50000.) 
 	Nobs = np.rint(np.exp(logNobs))
-	increasing_q_rates = 0
 	log_Nobs = np.log(Nobs)
 	if sim_loglinear:
 		true_sig2 = np.random.uniform(0.01,0.25) #0.1
@@ -421,41 +427,29 @@ if run_simulations:
 	print("seed",seed)
 
 	sim_number = 1
-	
+	counter = 0
 	while sim_number <= n_simulations:
+		counter += 1
 		print("simulating data...")
 		true_root, true_q, true_sig2, Nobs, age_oldest_obs_occ, x, log_Nobs,Ntrue = simulate_data(seed+sim_number)
 	
 		if np.sum(x)< 1: 
 			print("No fossils:",np.sum(x),"",age_oldest_obs_occ)
+			seed_s = "%s%s" % (counter, seed) # change seed if it doesn't work
+			seed = int(seed_s)
 		else:
 			if args.plot:
-				#file_name = "%s/sim_data%s_%s.pdf" % (args.outpath,sim_number,seed)
-				#fig = plt.figure(figsize=(12, 10))
-				#plot_divtraj = matplotlib.backends.backend_pdf.PdfPages(file_name)		
-				#plt.plot(mid_points[mid_points<true_root],np.log(Ntrue.T))
-				#plot_divtraj.savefig( fig )
-				#plt.close()
-				#fig2 = plt.figure(figsize=(12, 10))
-				#plt.plot(mid_points[mid_points<true_root],Ntrue.T)
-				#plot_divtraj.savefig( fig2 )
-				#plt.close()
-				#plot_divtraj.close()
-				
-				
 				file_name = "%s/sim_data%s_%s.pdf" % (args.outpath,sim_number,seed)
 				fig = plt.figure(figsize=(12, 10))
 				plt.plot(mid_points[mid_points<true_root],Ntrue.T)
 				mid_points_temp = mid_points[mid_points<true_root]
 				print(len(x), len(mid_points_temp), len(mid_points))
 				
-				
 				plt.plot(mid_points_temp[np.where(x > 0)],x[x > 0], 'ro')
 				for i in range(len(x)):
 					plt.text(mid_points_temp[i]-(1/150*true_root),-0.035*np.max(Ntrue), '%d' % (int(x[i])))
 	
 				plt.plot(np.zeros(int(Nobs)),np.arange(Nobs), 'ro')
-				#plt.text(0,-0.035*np.max(simTraj_all), '%d' % (int(Nobs)))
 				
 				title = "n. extant species: %s   n. fossils: %s   $\sigma^{2} = 10^{%s}$   $q_{avg} = 10^{%s}$" % \
 				(int(Nobs), int(np.sum(x)), np.round(np.log10(true_sig2),2), np.round(np.log10(np.mean(true_q)),2))
@@ -466,17 +460,6 @@ if run_simulations:
 				plot_divtraj = matplotlib.backends.backend_pdf.PdfPages(file_name)		
 				plot_divtraj.savefig( fig )
 				plot_divtraj.close()
-								
-				
-				
-				
-				
-				
-				
-				
-				
-				
-				
 	
 			print("replicate:", sim_number)
 			print("N. fossils:",np.sum(x),"Obs age:", age_oldest_obs_occ)
