@@ -215,12 +215,14 @@ def get_avg_likelihood(log_Nobs, Nobs, fossil_data, est_root, est_sig2, est_q, e
 		return -np.inf, 0
 	else:
 		dt = 1./age_oldest_obs_occ
-		time_vec = np.arange(len(x_augmented)) - age_oldest_obs_occ/2
+		time_vec = np.arange(len(x_augmented)).astype(float)[::-1] 
 		time_vec *= dt
-		q_vec = est_q + (-est_a)*time_vec
-		q_vec[q_vec<0] = small_number
-		#print(q_vec)
-		
+		q_vec = est_q + (est_a)*time_vec
+		q_vec[q_vec<0] = np.min(np.abs(q_vec))
+		# print(np.log(q_vec)) #<- with est_a > q is highest at the recent
+		# print(np.log(est_q))# <- est_q ~ q at the root
+		# print(x_augmented)
+		# quit()
 		
 		sampling_prob_vec = np.ones(len(x_augmented))- np.exp(-q_vec)
 		# print(np.log(sampling_prob_vec))
@@ -242,7 +244,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
 	lik_A = np.nan
 	tries = 0
 	while np.isnan(lik_A):
-		est_a_A = 0
+		est_a_A = 0.0002
 		
 		if tries <= 100:
 			# init root age
@@ -412,7 +414,7 @@ def simulate_data(rseed=0):
 	# simulate fossil occs
 	true_q = np.exp( np.random.normal(log_q_mean,log_q_std,len(mid_points)))[mid_points<true_root]
 	if increasing_q_rates:
-		true_q = np.random.choice(true_q,len(true_q),replace=0,p=true_q/np.sum(true_q))
+		true_q = np.sort(true_q)[::-1] # rate increases toward the recent
 
 	true_q = true_q * np.random.binomial(1,1-freq_zero_preservation,len(true_q))
 	true_q[true_q>0.1] = 0.1
