@@ -22,6 +22,7 @@ p.add_argument('-sim',      type=int,   help='if >1 run simulations', default = 
 p.add_argument('-biased_q', type=int,   help='if 1 set increasing q through time', default = 0)
 p.add_argument('-freq_q0',  type=float, help='frequency of 0-sampling rate', default = 0.1)
 p.add_argument('-q_var',    type=int,   help='0) constant q 1) linearly changing q', default = 0)
+p.add_argument('-q_exp',    type=int,   help='magnitude of variation', default = 1)
 p.add_argument('-clades',   type=int,   help='range of clade to be analyzed', default = [0,0], nargs=2)
 p.add_argument('-outpath',  type=str,   help='path output', default = ".")
 p.add_argument('-clade_name', type=str,   help='', default = "")
@@ -51,6 +52,7 @@ small_number = 10e-10
 n_simulations = args.sim
 save_mcmc_samples = 1
 mid_points = np.linspace(0,500,int(500/2.5)+1)
+bin_size = np.abs(np.diff(mid_points)[0])
 n_DA_samples = args.nDA
 sim_loglinear = 0
 freq_par_updates = args.f
@@ -61,7 +63,7 @@ q_var_model = args.q_var
 # simulation settings
 increasing_q_rates = args.biased_q
 freq_zero_preservation = args.freq_q0
-bias_exp = 1.
+bias_exp = args.q_exp
 
 
 
@@ -215,12 +217,12 @@ def get_avg_likelihood(log_Nobs, Nobs, fossil_data, est_root, est_sig2, est_q, e
     if len(x_augmented)==0:
         return -np.inf, 0
     else:
-        dt = 1./age_oldest_obs_occ
+        dt = bin_size/100 #1./age_oldest_obs_occ
+        # print(dt, 1./age_oldest_obs_occ)
         time_vec = np.arange(len(x_augmented)).astype(float)[::-1] 
         time_vec *= dt
         q_vec = est_q * np.exp(est_a*time_vec)
-        # q_vec[q_vec<0] = np.min(np.abs(q_vec))
-        # print(np.log(q_vec)) #<- with est_a > q is highest at the recent
+        # print(np.log(q_vec)) #<- with est_a > 0 is highest at the recent
         # print(np.log(est_q))# <- est_q ~ q at the root
         # print(x_augmented)
         # quit()
@@ -265,7 +267,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
             else:
                 lik_A, DA_counts = get_avg_likelihood(log_Nobs, Nobs, x, est_root_A, est_sig2_A, est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
                 #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
-                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=1.1,b=1) + normal_pdf(est_a_A,0,1) 
+                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=1.1,b=1) + gamma_pdf(est_a_A,1,0.01) 
         elif tries <= 1000:
             est_root_A =  age_oldest_obs_occ*(1+np.random.uniform(0.05,1 ))
             # init sig2
@@ -283,17 +285,19 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
             else:
                 lik_A, DA_counts = get_avg_likelihood(log_Nobs, Nobs, x, est_root_A, est_sig2_A, est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
                 #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
-                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=1.1,b=1) + normal_pdf(est_a_A,0,10) 
+                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=1.1,b=1) + gamma_pdf(est_a_A,1,0.01) 
         else:
             sys.exit("Failed to initialize model.")
         tries+=1
         
     print("Running MCMC...")
     if save_mcmc_samples:
+        model_out = ""
+        if increasing_q_rates:
+            model_out = model_out + "_qbias%s" % bias_exp
         if q_var_model:
-            model_out = "_qvar"
-        else:
-            model_out = ""
+            model_out = model_out + "_qvar"
+            
         if run_simulations:
             out_name = "%s/mcmc_%s_%s_f%s%s%s.log" % (args.outpath, sim_n, seed, freq_par_updates, args.out, model_out)
             logfile = open(out_name, "w") 
@@ -350,7 +354,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
         else:
             lik, DA_counts = get_avg_likelihood(log_Nobs, Nobs, x, est_root, np.exp(est_sig2), est_q, est_a, x_augmented, simTraj_all )
         
-        prior = gamma_pdf(np.exp(est_sig2-log_Nobs),a=1.,b=0.1) + gamma_pdf(est_q,a=1.1,b=1) + normal_pdf(est_a,0,10) 
+        prior = gamma_pdf(np.exp(est_sig2-log_Nobs),a=1.,b=0.1) + gamma_pdf(est_q,a=1.1,b=1) + gamma_pdf(est_a,1,0.01) 
     
         if (lik-lik_A) + (prior-prior_A) + (h1+h2+h3) >= np.log(np.random.random()) or accept==1 and np.isfinite(lik):
             est_root_A = est_root
@@ -387,57 +391,58 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
 def simulate_data(rseed=0):
     if rseed > 0:
         np.random.seed(rseed)
-        
-    true_root = np.random.uniform(10,180)
-    log_q_mean = -8.52 # 1/5000 mean Nfossil 
-    log_q_std = 1
+    age_oldest_obs_occ = 0
+    while age_oldest_obs_occ <= 0:    
+        true_root = np.random.uniform(10,180)
+        log_q_mean = -8.52 # 1/5000 mean Nfossil 
+        log_q_std = 1
 
-    logNobs = np.random.uniform(np.log(100),np.log(20000)) # np.log(50000.) 
-    Nobs = np.rint(np.exp(logNobs))
-    log_Nobs = np.log(Nobs)
-    if sim_loglinear:
-        true_sig2 = np.random.uniform(0.01,0.25) #0.1
-        logNtrue = sample_path_batch_discrete(time_bins = mid_points[mid_points<true_root], n_reps =100, sig2=true_sig2, y_start = log_Nobs,positive=0)
-        m = np.min(logNtrue,axis=1)
-        logNtrue = logNtrue[m>=0][0]
-        Ntrue = np.rint(np.exp(logNtrue))
-    else:
-        true_sig2 = np.random.uniform(10, 50)*Nobs #0.1
-        Ntrue = sample_path_batch_discrete(time_bins = mid_points[mid_points<true_root], n_reps =100, sig2=true_sig2, y_start = Nobs,positive=0)
-        Ntrue = np.rint(Ntrue)+1 # add +1 to make the bridge start at 1
-        m = np.min(Ntrue,axis=1)
-        print(m)
-        Ntrue = Ntrue[m>=1][0]
-        #Ntrue[Ntrue==0] = 1
-        logNtrue = np.log(Ntrue)
-        true_sig2 = np.log(true_sig2)
-    
-    # simulate fossil occs
-    true_q = np.exp( np.random.normal(log_q_mean,log_q_std,len(mid_points)))[mid_points<true_root]
-    if increasing_q_rates:
-        true_q = np.random.choice(true_q,len(true_q),replace=0,p=(true_q**bias_exp)/np.sum((true_q**bias_exp)))    
-        #true_q = np.sort(true_q)[::-1] # rate increases toward the recent
-
-    true_q = true_q * np.random.binomial(1,1-freq_zero_preservation,len(true_q))
-    true_q[true_q>0.1] = 0.1
-    # preserved occs
-    x = np.rint(Ntrue*true_q)[::-1] # order is temporarily reversed
-    # remove first x values if they are == 0
-    j,c=0,0
-    for i in range(len(x)):
-        if x[i]==0 and j==0:
-            c+=1
+        logNobs = np.random.uniform(np.log(100),np.log(20000)) # np.log(50000.) 
+        Nobs = np.rint(np.exp(logNobs))
+        log_Nobs = np.log(Nobs)
+        if sim_loglinear:
+            true_sig2 = np.random.uniform(0.01,0.25) #0.1
+            logNtrue = sample_path_batch_discrete(time_bins = mid_points[mid_points<true_root], n_reps =100, sig2=true_sig2, y_start = log_Nobs,positive=0)
+            m = np.min(logNtrue,axis=1)
+            logNtrue = logNtrue[m>=0][0]
+            Ntrue = np.rint(np.exp(logNtrue))
         else:
-            break
-
-    x = x[c:][::-1]
-    age_oldest_obs_occ = mid_points[len(x)-1]+0
+            true_sig2 = np.random.uniform(10, 50)*Nobs #0.1
+            Ntrue = sample_path_batch_discrete(time_bins = mid_points[mid_points<true_root], n_reps =100, sig2=true_sig2, y_start = Nobs,positive=0)
+            Ntrue = np.rint(Ntrue)+1 # add +1 to make the bridge start at 1
+            m = np.min(Ntrue,axis=1)
+            print(m)
+            Ntrue = Ntrue[m>=1][0]
+            #Ntrue[Ntrue==0] = 1
+            logNtrue = np.log(Ntrue)
+            true_sig2 = np.log(true_sig2)
     
-    if verbose:
-        print(x)
-        print("true_root",true_root, "obs_root",age_oldest_obs_occ)
-        print("true_q (log10)",np.log10(true_q+0.000000001), np.max(true_q)/np.min(true_q[true_q>0]))
-        print( "Ntrue", Ntrue, "Nfossils",np.sum(x))
+        # simulate fossil occs
+        true_q = np.exp( np.random.normal(log_q_mean,log_q_std,len(mid_points)))[mid_points<true_root]
+        if increasing_q_rates:
+            true_q = np.random.choice(true_q,len(true_q),replace=0,p=(true_q**bias_exp)/np.sum((true_q**bias_exp)))    
+            #true_q = np.sort(true_q)[::-1] # rate increases toward the recent
+
+        true_q = true_q * np.random.binomial(1,1-freq_zero_preservation,len(true_q))
+        true_q[true_q>0.1] = 0.1
+        # preserved occs
+        x = np.rint(Ntrue*true_q)[::-1] # order is temporarily reversed
+        # remove first x values if they are == 0
+        j,c=0,0
+        for i in range(len(x)):
+            if x[i]==0 and j==0:
+                c+=1
+            else:
+                break
+
+        x = x[c:][::-1]
+        age_oldest_obs_occ = mid_points[len(x)-1]+0
+    
+        if verbose:
+            print(x)
+            print("true_root",true_root, "obs_root",age_oldest_obs_occ)
+            print("true_q (log10)",np.log10(true_q+0.000000001), np.max(true_q)/np.min(true_q[true_q>0]))
+            print( "Ntrue", Ntrue, "Nfossils",np.sum(x))
     
     return true_root, true_q, true_sig2, Nobs, age_oldest_obs_occ, x, log_Nobs, Ntrue
 
@@ -515,6 +520,7 @@ else:
     
     max_age = 300
     mid_points = np.linspace(fossil_data[0,0],max_age,int(max_age/fossil_data[0,0]))
+    bin_size = np.abs(np.diff(mid_points)[0])
     
     counts_file = args.div_table
     diversity_table = np.genfromtxt(counts_file,dtype='str',skip_header=1)
