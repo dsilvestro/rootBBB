@@ -31,6 +31,8 @@ p.add_argument('-out',      type=str,   help='add string to output', default = "
 p.add_argument('-nDA',      type=int,   help='DA samples', default = 1000)
 p.add_argument('-DAbatch',  type=int,   help='DA batch size', default = 1000)
 p.add_argument('-ws',       type=float, help='win sizes root, sig2, q', default = [10,1.25,1.25], nargs=3)
+p.add_argument('-max_age',  type=int,   help='Max boundary of uniform prior on the root age', default = 300)
+
 
 
 print("""
@@ -65,6 +67,7 @@ increasing_q_rates = args.biased_q
 freq_zero_preservation = args.freq_q0
 bias_exp = args.q_exp
 
+max_age = args.max_age
 
 
 
@@ -334,7 +337,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
         
         if update:
             if rr[2]< 0.7:
-                est_root, h1 = update_normal(est_root_A , m=age_oldest_obs_occ, M=300, d=args.ws[0])
+                est_root, h1 = update_normal(est_root_A , m=age_oldest_obs_occ, M=max_age, d=args.ws[0])
             if rr[2]> 0.5:
                 if sim_loglinear:
                     est_sig2, h2 = update_multiplier(est_sig2_A ,d=1.05)
@@ -518,7 +521,6 @@ else:
     fossil_data = np.loadtxt(data_file,skiprows=1)
     taxa_names = np.array(next(open(data_file)).split())
     
-    max_age = 300
     mid_points = np.linspace(fossil_data[0,0],max_age,int(max_age/fossil_data[0,0]))
     bin_size = np.abs(np.diff(mid_points)[0])
     
