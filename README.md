@@ -21,11 +21,12 @@ numpy.
 
 '-seed': type=int, help='random seed (default = U[1000,9999])'
 
+'-q_var': type=int, help='0) constant sampling rate 1) linearly increasing sampling rate'
 ~~~
 
 ### Usage
 ```
-python3 rootBBB.py -fossil_data fossil_counts_2.5.txt -div_table family_diversity.txt -clade_name acanthaceae
+python3 rootBBB.py -fossil_data fossil_counts_2.5.txt -div_table family_diversity.txt -q_var 1 -clade_name acanthaceae
 
 ```
 
