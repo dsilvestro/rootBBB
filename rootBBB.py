@@ -263,12 +263,31 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
                 est_sig2_A = np.log(np.random.uniform(10, 50)*Nobs)
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
-            x_augmented_A, simTraj_all_A = get_imputations(log_Nobs, Nobs, x, est_root_A, est_sig2_A, n_samples=n_DA_samples)
+            x_augmented_A, simTraj_all_A = get_imputations(log_Nobs, Nobs, x, est_root_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
             if len(x_augmented_A)==0:
                 # ie imputation didn't work
                 lik_A = np.nan
             else:
-                lik_A, DA_counts = get_avg_likelihood(log_Nobs, Nobs, x, est_root_A, est_sig2_A, est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
+                lik_A, DA_counts = get_avg_likelihood(log_Nobs, Nobs, x, est_root_A, np.exp(est_sig2_A), est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
+                #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
+                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=1.1,b=1) + gamma_pdf(est_a_A,1,0.01) 
+        if tries <= 200:
+            # init root age
+            #est_root_A = np.random.random()
+            est_root_A = age_oldest_obs_occ*(1+np.random.uniform(0.05,0.25 ))
+            # init sig2
+            if sim_loglinear:
+                est_sig2_A = np.random.uniform(0.01, 0.2)
+            else:
+                est_sig2_A = np.log(np.random.uniform(0, 5)*Nobs)
+            # init q_rate
+            est_q_A = np.random.uniform(0.0005, 0.002)
+            x_augmented_A, simTraj_all_A = get_imputations(log_Nobs, Nobs, x, est_root_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
+            if len(x_augmented_A)==0:
+                # ie imputation didn't work
+                lik_A = np.nan
+            else:
+                lik_A, DA_counts = get_avg_likelihood(log_Nobs, Nobs, x, est_root_A, np.exp(est_sig2_A), est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
                 #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
                 prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=1.1,b=1) + gamma_pdf(est_a_A,1,0.01) 
         elif tries <= 1000:
@@ -281,12 +300,12 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
 
-            x_augmented_A, simTraj_all_A = get_imputations(log_Nobs, Nobs, x, est_root_A, est_sig2_A, n_samples=n_DA_samples)
+            x_augmented_A, simTraj_all_A = get_imputations(log_Nobs, Nobs, x, est_root_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
             if len(x_augmented_A)==0:
                 # ie imputation didn't work
                 lik_A = np.nan
             else:
-                lik_A, DA_counts = get_avg_likelihood(log_Nobs, Nobs, x, est_root_A, est_sig2_A, est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
+                lik_A, DA_counts = get_avg_likelihood(log_Nobs, Nobs, x, est_root_A, np.exp(est_sig2_A), est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
                 #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
                 prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=1.1,b=1) + gamma_pdf(est_a_A,1,0.01) 
         else:
@@ -317,6 +336,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
     if verbose: print(res.shape)
     sampled_iteration=0
     
+    #est_sig2_A = np.log(est_sig2_A) # rate is log-transformed in the MCMC
     for iteration in range(args.n):
         accepted = 0
         #start = datetime.now()
@@ -325,7 +345,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
         h1,h2,h3 = 0,0,0
         accept = 0
         
-        rr =np.random.random(3)
+        rr = np.random.random(3)
         if rr[0]< freq_par_updates: 
             update = 1
             accept = 0
