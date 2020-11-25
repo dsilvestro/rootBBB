@@ -33,6 +33,8 @@ python3 rootBBB.py -fossil_data fossil_counts_2.5.txt -div_table family_diversit
 
 ```
 
+The sampled parameter values are saved in a `*.log` file which can be inspected in Tracer (https://beast.community/tracer;  doi:10.1093/sysbio/syy032).
+
 ### Running on simulated data
 ```
 python3 rootBBB.py -sim 10 -seed 9600

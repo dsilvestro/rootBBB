@@ -56,7 +56,6 @@ save_mcmc_samples = 1
 mid_points = np.linspace(0,500,int(500/2.5)+1)
 bin_size = np.abs(np.diff(mid_points)[0])
 n_DA_samples = args.nDA
-sim_loglinear = 0
 freq_par_updates = args.f
 verbose = args.verbose
 DAbatch = args.DAbatch
@@ -186,26 +185,17 @@ def get_imputations(log_Nobs, Nobs, fossil_data, est_root, est_sig2, n_samples=1
     while j <= n_samples:
     #if 2>1:
         # simulate expected trajectories
-        if sim_loglinear:
-            simTraj = sample_path_batch_discrete(time_bins, n_reps =DAbatch, sig2=est_sig2, y_start = log_Nobs)
-            x_augmented = np.zeros(simTraj.shape[1])
-            x_augmented[0:len(fossil_data)] = fossil_data+0    
-            m = np.min(np.exp(simTraj)-x_augmented,axis=1)
-        else:
-            simTraj = sample_path_batch_discrete(time_bins, n_reps =DAbatch, sig2=est_sig2, y_start = Nobs)
-            simTraj = np.rint(simTraj)+1
-            x_augmented = np.zeros(simTraj.shape[1])
-            x_augmented[0:len(fossil_data)] = fossil_data+0    
-            m = np.min(simTraj-x_augmented,axis=1)
+        simTraj = sample_path_batch_discrete(time_bins, n_reps =DAbatch, sig2=est_sig2, y_start = Nobs)
+        simTraj = np.rint(simTraj)+1
+        x_augmented = np.zeros(simTraj.shape[1])
+        x_augmented[0:len(fossil_data)] = fossil_data+0    
+        m = np.min(simTraj-x_augmented,axis=1)
                 
         #remove incompatible trajectories
         simTraj = simTraj[m>=0]
         #remove a priori incompatible trajectories
         m = np.min(simTraj,axis=1)
-        if sim_loglinear:
-            simTraj = simTraj[m>=0]
-        else:
-            simTraj = simTraj[m>=1]
+        simTraj = simTraj[m>=1]
         valid_samples = simTraj.shape[0]
         simTraj_all[j:np.min([n_samples, j+valid_samples]), :] = simTraj[0:np.min([valid_samples, n_samples-j]), :]
         
@@ -232,10 +222,7 @@ def get_avg_likelihood(log_Nobs, Nobs, fossil_data, est_root, est_sig2, est_q, e
         
         sampling_prob_vec = np.ones(len(x_augmented))- np.exp(-q_vec)
         # print(np.log(sampling_prob_vec))
-        if sim_loglinear:
-            lik_matrix = binomial_pmf(x_augmented,np.exp(simTraj_all),sampling_prob_vec)
-        else:
-            lik_matrix = binomial_pmf(x_augmented,simTraj_all,sampling_prob_vec)
+        lik_matrix = binomial_pmf(x_augmented,simTraj_all,sampling_prob_vec)
         # lik_avg = np.log(np.mean(np.exp( np.sum(lik_matrix,axis=1) )))
         # to avoid underflow:
         lik_i = np.sum(lik_matrix,axis=1)
@@ -257,10 +244,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
             #est_root_A = np.random.random()
             est_root_A = age_oldest_obs_occ*(1+np.random.uniform(0.05,0.25 ))
             # init sig2
-            if sim_loglinear:
-                est_sig2_A = np.random.uniform(0.01, 0.2)
-            else:
-                est_sig2_A = np.log(np.random.uniform(10, 50)*Nobs)
+            est_sig2_A = np.log(np.random.uniform(10, 50)*Nobs)
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
             x_augmented_A, simTraj_all_A = get_imputations(log_Nobs, Nobs, x, est_root_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
@@ -276,10 +260,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
             #est_root_A = np.random.random()
             est_root_A = age_oldest_obs_occ*(1+np.random.uniform(0.05,0.25 ))
             # init sig2
-            if sim_loglinear:
-                est_sig2_A = np.random.uniform(0.01, 0.2)
-            else:
-                est_sig2_A = np.log(np.random.uniform(0, 5)*Nobs)
+            est_sig2_A = np.log(np.random.uniform(0, 5)*Nobs)
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
             x_augmented_A, simTraj_all_A = get_imputations(log_Nobs, Nobs, x, est_root_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
@@ -293,10 +274,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
         elif tries <= 1000:
             est_root_A =  age_oldest_obs_occ*(1+np.random.uniform(0.05,1 ))
             # init sig2
-            if sim_loglinear:
-                est_sig2_A = np.random.uniform(0.01, 0.2)
-            else:
-                est_sig2_A = np.log(np.random.uniform(1, 100)*Nobs)
+            est_sig2_A = np.log(np.random.uniform(1, 100)*Nobs)
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
 
@@ -359,23 +337,17 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
             if rr[2]< 0.7:
                 est_root, h1 = update_normal(est_root_A , m=age_oldest_obs_occ, M=max_age, d=args.ws[0])
             if rr[2]> 0.5:
-                if sim_loglinear:
-                    est_sig2, h2 = update_multiplier(est_sig2_A ,d=1.05)
-                else:
-                    est_sig2EXP, h2 = update_multiplier(np.exp(est_sig2_A),args.ws[1])
-                    est_sig2 = np.log(est_sig2EXP)
-                    est_q   , h3 = update_multiplier(est_q_A ,d=args.ws[2])
-                    if q_var_model:
-                        est_a, _ = np.abs(update_normal(est_a_A, d=1, m= -100, M=100))
+                est_sig2EXP, h2 = update_multiplier(np.exp(est_sig2_A),args.ws[1])
+                est_sig2 = np.log(est_sig2EXP)
+                est_q   , h3 = update_multiplier(est_q_A ,d=args.ws[2])
+                if q_var_model:
+                    est_a, _ = np.abs(update_normal(est_a_A, d=1, m= -100, M=100))
             x_augmented, simTraj_all = get_imputations(log_Nobs, Nobs, x, est_root, np.exp(est_sig2), n_samples=n_DA_samples)
             accept = 0
         
         
         
-        if sim_loglinear:
-            lik, DA_counts = get_avg_likelihood(log_Nobs, Nobs, x, est_root, est_sig2, est_q, est_q, est_a, x_augmented, simTraj_all )
-        else:
-            lik, DA_counts = get_avg_likelihood(log_Nobs, Nobs, x, est_root, np.exp(est_sig2), est_q, est_a, x_augmented, simTraj_all )
+        lik, DA_counts = get_avg_likelihood(log_Nobs, Nobs, x, est_root, np.exp(est_sig2), est_q, est_a, x_augmented, simTraj_all )
         
         prior = gamma_pdf(np.exp(est_sig2-log_Nobs),a=1.,b=0.1) + gamma_pdf(est_q,a=1.1,b=1) + gamma_pdf(est_a,1,0.01) 
     
@@ -423,22 +395,15 @@ def simulate_data(rseed=0):
         logNobs = np.random.uniform(np.log(100),np.log(20000)) # np.log(50000.) 
         Nobs = np.rint(np.exp(logNobs))
         log_Nobs = np.log(Nobs)
-        if sim_loglinear:
-            true_sig2 = np.random.uniform(0.01,0.25) #0.1
-            logNtrue = sample_path_batch_discrete(time_bins = mid_points[mid_points<true_root], n_reps =100, sig2=true_sig2, y_start = log_Nobs,positive=0)
-            m = np.min(logNtrue,axis=1)
-            logNtrue = logNtrue[m>=0][0]
-            Ntrue = np.rint(np.exp(logNtrue))
-        else:
-            true_sig2 = np.random.uniform(10, 50)*Nobs #0.1
-            Ntrue = sample_path_batch_discrete(time_bins = mid_points[mid_points<true_root], n_reps =100, sig2=true_sig2, y_start = Nobs,positive=0)
-            Ntrue = np.rint(Ntrue)+1 # add +1 to make the bridge start at 1
-            m = np.min(Ntrue,axis=1)
-            print(m)
-            Ntrue = Ntrue[m>=1][0]
-            #Ntrue[Ntrue==0] = 1
-            logNtrue = np.log(Ntrue)
-            true_sig2 = np.log(true_sig2)
+        true_sig2 = np.random.uniform(10, 50)*Nobs #0.1
+        Ntrue = sample_path_batch_discrete(time_bins = mid_points[mid_points<true_root], n_reps =100, sig2=true_sig2, y_start = Nobs,positive=0)
+        Ntrue = np.rint(Ntrue)+1 # add +1 to make the bridge start at 1
+        m = np.min(Ntrue,axis=1)
+        print(m)
+        Ntrue = Ntrue[m>=1][0]
+        #Ntrue[Ntrue==0] = 1
+        logNtrue = np.log(Ntrue)
+        true_sig2 = np.log(true_sig2)
     
         # simulate fossil occs
         true_q = np.exp( np.random.normal(log_q_mean,log_q_std,len(mid_points)))[mid_points<true_root]
