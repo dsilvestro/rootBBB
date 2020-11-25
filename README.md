@@ -29,7 +29,7 @@ The program requires Python v.3 (it has been tested with 3.7 and 3.8) and the fo
 
 ### Usage
 ```
-python3 rootBBB.py -fossil_data fossil_counts_2.5.txt -div_table family_diversity.txt -q_var 1 -clade_name acanthaceae
+python3 rootBBB.py -fossil_data example_data/fossil_counts_2.5.txt -div_table example_data/family_diversity.txt -q_var 1 -clade_name acanthaceae
 
 ```
 
