@@ -37,7 +37,7 @@ p.add_argument('-max_age',  type=int,   help='Max boundary of uniform prior on t
 
 print("""
 
-Root age estimator using a Bayesian Brownian bridge.
+Clade age estimator using a Bayesian Brownian bridge.
 
 """)
 
@@ -238,13 +238,15 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
     tries = 0
     while np.isnan(lik_A):
         est_a_A = 0.
+        est_death_m_A = 0. # death age multiplier of age_youngest_obs_occ \in (0, 1)
         
         if tries <= 100:
+            print("Attempt 1...")
             # init root age
             #est_root_A = np.random.random()
             est_root_A = age_oldest_obs_occ*(1+np.random.uniform(0.05,0.25 ))
             # init sig2
-            est_sig2_A = np.log(1 + np.random.uniform(10, 50)*Nobs)
+            est_sig2_A = np.log(1 + np.random.uniform(10, 50)*np.max(1, Nobs))
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
             x_augmented_A, simTraj_all_A = get_imputations(Nobs, x, est_root_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
@@ -256,11 +258,12 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
                 #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
                 prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=1.1,b=1) + gamma_pdf(est_a_A,1,0.01) 
         if tries <= 200:
+            print("Attempt 2...")
             # init root age
             #est_root_A = np.random.random()
             est_root_A = age_oldest_obs_occ*(1+np.random.uniform(0.05,0.25 ))
             # init sig2
-            est_sig2_A = np.log(np.random.uniform(0, 5)*Nobs)
+            est_sig2_A = np.log(np.random.uniform(0, 5)*np.max(1, Nobs))
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
             x_augmented_A, simTraj_all_A = get_imputations(Nobs, x, est_root_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
@@ -272,9 +275,10 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
                 #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
                 prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=1.1,b=1) + gamma_pdf(est_a_A,1,0.01) 
         elif tries <= 1000:
+            print("Attempt 3...")
             est_root_A =  age_oldest_obs_occ*(1+np.random.uniform(0.05,1 ))
             # init sig2
-            est_sig2_A = np.log(np.random.uniform(1, 100)*Nobs)
+            est_sig2_A = np.log(np.random.uniform(1, 100)*np.max(1, Nobs))
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
 
@@ -301,13 +305,13 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
         if run_simulations:
             out_name = "%s/mcmc_%s_%s_f%s%s%s.log" % (args.outpath, sim_n, seed, freq_par_updates, args.out, model_out)
             logfile = open(out_name, "w") 
-            text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\troot_true\tq_med_true\tsig2_true\tDA_counts\troot_est\tq_est\ta_est\tsig2_est"
+            text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\tdeath_obs\troot_true\tq_med_true\tsig2_true\tDA_counts\troot_est\tdeath_est\tq_est\ta_est\tsig2_est"
             logfile.writelines(text_str)
         else:
             out_name = "%s/%s_mcmc_%s_f%s%s%s.log" % (args.outpath, sim_n, seed, freq_par_updates, args.out, model_out)
             print(out_name)
             logfile = open(out_name, "w") 
-            text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\tDA_counts\troot_est\tq_est\t\ta_est\tsig2_est"
+            text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\tdeath_obs\tDA_counts\troot_est\tdeath_est\tq_est\t\ta_est\tsig2_est"
             logfile.writelines(text_str)
             
     res = np.zeros((int(args.n/args.s), 4))
@@ -318,7 +322,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
     for iteration in range(args.n):
         accepted = 0
         #start = datetime.now()
-        est_root, est_sig2, est_q, est_a = est_root_A+0, est_sig2_A+0, est_q_A+0, est_a_A+0
+        est_root, est_death_m, est_sig2, est_q, est_a = est_root_A+0, est_death_m_A+0, est_sig2_A+0, est_q_A+0, est_a_A+0
         x_augmented, simTraj_all = x_augmented_A+0, simTraj_all_A+0
         h1,h2,h3 = 0,0,0
         accept = 0
@@ -539,11 +543,16 @@ if run_simulations:
             seed = int(seed_s)
         else:
             if args.plot:
+                mid_points_temp = mid_points[indx_clade_life_span]
+                print("\n\nPLOTTING")
+                print(x)
+                print(indx_clade_life_span)
+                print(len(x), len(mid_points_temp), len(mid_points), len(Ntrue.T))
                 file_name = "%s/sim_data%s_%s.pdf" % (args.outpath,sim_number,seed)
                 fig = plt.figure(figsize=(12, 10))
-                plt.plot(mid_points[indx_clade_life_span],Ntrue.T)
-                mid_points_temp = mid_points[indx_clade_life_span]
-                print(len(x), len(mid_points_temp), len(mid_points))
+                plt.plot(mid_points[0:len(Ntrue)],Ntrue.T)
+                
+                
                 
                 plt.plot(mid_points_temp[np.where(x > 0)],x[x > 0], 'ro')
                 for i in range(len(x)):
@@ -629,3 +638,4 @@ else:
             print("N. fossils:",np.sum(x),age_oldest_obs_occ)
             res=run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, taxon)
         
+"python3 rootBBB.py -sim 1 -seed 5962 -p 10"
