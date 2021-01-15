@@ -53,7 +53,8 @@ small_number = 10e-10
 
 n_simulations = args.sim
 save_mcmc_samples = 1
-mid_points = np.linspace(0,500,int(500/2.5)+1)
+max_age = args.max_age
+mid_points = np.linspace(0,2*max_age,int(2*max_age/2.5)+1)
 bin_size = np.abs(np.diff(mid_points)[0])
 n_DA_samples = args.nDA
 freq_par_updates = args.f
@@ -66,7 +67,6 @@ increasing_q_rates = args.biased_q
 freq_zero_preservation = args.freq_q0
 bias_exp = args.q_exp
 
-max_age = args.max_age
 simulate_extinct = 1
 
 
@@ -177,8 +177,17 @@ def sample_path_batch_discrete(time_bins = np.arange(100), n_reps = 1, y_start =
     B[:, -1] = 0 # added: set the last B to Zero
     return B
     
-def get_imputations(Nobs, fossil_data, est_root, est_sig2, n_samples=1000):
-    time_bins = mid_points[mid_points<est_root]
+def get_imputations(Nobs, fossil_data, est_root_r, est_ext, est_sig2, n_samples=1000):    
+    est_root = est_root_r - est_ext
+    mid_points_shift = mid_points[mid_points < est_root_r] 
+    
+    x_augmented = np.zeros(len(mid_points_shift))
+    x_augmented[0:len(fossil_data)] = fossil_data+0    
+    
+    x_augmented = x_augmented[mid_points_shift > est_ext]
+    mid_points_shift = mid_points_shift[mid_points_shift > est_ext]
+    
+    time_bins = mid_points_shift
     simTraj_all = np.zeros((n_samples,len(time_bins)))
     j=0
     counter = 0
@@ -187,8 +196,6 @@ def get_imputations(Nobs, fossil_data, est_root, est_sig2, n_samples=1000):
         # simulate expected trajectories
         simTraj = sample_path_batch_discrete(time_bins, n_reps =DAbatch, sig2=est_sig2, y_start = Nobs)
         simTraj = np.rint(simTraj)+1
-        x_augmented = np.zeros(simTraj.shape[1])
-        x_augmented[0:len(fossil_data)] = fossil_data+0    
         m = np.min(simTraj-x_augmented,axis=1)
                 
         #remove incompatible trajectories
@@ -210,7 +217,7 @@ def get_avg_likelihood(Nobs, fossil_data, est_root, est_sig2, est_q, est_a, x_au
     if len(x_augmented)==0:
         return -np.inf, 0
     else:
-        dt = bin_size/100 #1./age_oldest_obs_occ
+        dt = bin_size/100 # rescale time axis to determine the slope of the q-increase
         # print(dt, 1./age_oldest_obs_occ)
         time_vec = np.arange(len(x_augmented)).astype(float)[::-1] 
         time_vec *= dt
@@ -233,12 +240,13 @@ def get_avg_likelihood(Nobs, fossil_data, est_root, est_sig2, est_q, est_a, x_au
         #quit()
         return lik_avg, len(lik_i[np.exp(lik_i-lik_max)>0])
 
-def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
+def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
     lik_A = np.nan
     tries = 0
+    # initialize MCMC
     while np.isnan(lik_A):
         est_a_A = 0.
-        est_death_m_A = 0. # death age multiplier of age_youngest_obs_occ \in (0, 1)
+        est_ext_A = 0. # ext age multiplier of age_youngest_obs_occ \in (0, 1)
         
         if tries <= 100:
             print("Attempt 1...")
@@ -249,7 +257,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
             est_sig2_A = np.log(1 + np.random.uniform(10, 50)*np.max(1, Nobs))
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
-            x_augmented_A, simTraj_all_A = get_imputations(Nobs, x, est_root_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
+            x_augmented_A, simTraj_all_A = get_imputations(Nobs, x, est_root_A, est_ext_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
             if len(x_augmented_A)==0:
                 # ie imputation didn't work
                 lik_A = np.nan
@@ -266,7 +274,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
             est_sig2_A = np.log(np.random.uniform(0, 5)*np.max(1, Nobs))
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
-            x_augmented_A, simTraj_all_A = get_imputations(Nobs, x, est_root_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
+            x_augmented_A, simTraj_all_A = get_imputations(Nobs, x, est_root_A, est_ext_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
             if len(x_augmented_A)==0:
                 # ie imputation didn't work
                 lik_A = np.nan
@@ -282,7 +290,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
 
-            x_augmented_A, simTraj_all_A = get_imputations(Nobs, x, est_root_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
+            x_augmented_A, simTraj_all_A = get_imputations(Nobs, x, est_root_A, est_ext_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
             if len(x_augmented_A)==0:
                 # ie imputation didn't work
                 lik_A = np.nan
@@ -305,16 +313,16 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
         if run_simulations:
             out_name = "%s/mcmc_%s_%s_f%s%s%s.log" % (args.outpath, sim_n, seed, freq_par_updates, args.out, model_out)
             logfile = open(out_name, "w") 
-            text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\tdeath_obs\troot_true\tq_med_true\tsig2_true\tDA_counts\troot_est\tdeath_est\tq_est\ta_est\tsig2_est"
+            text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\text_obs\troot_true\text_true\tq_med_true\tsig2_true\tDA_counts\troot_est\text_est\tq_est\ta_est\tsig2_est"
             logfile.writelines(text_str)
         else:
             out_name = "%s/%s_mcmc_%s_f%s%s%s.log" % (args.outpath, sim_n, seed, freq_par_updates, args.out, model_out)
             print(out_name)
             logfile = open(out_name, "w") 
-            text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\tdeath_obs\tDA_counts\troot_est\tdeath_est\tq_est\t\ta_est\tsig2_est"
+            text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\text_obs\tDA_counts\troot_est\text_est\tq_est\t\ta_est\tsig2_est"
             logfile.writelines(text_str)
             
-    res = np.zeros((int(args.n/args.s), 4))
+    res = np.zeros((int(args.n/args.s), 5))
     if verbose: print(res.shape)
     sampled_iteration=0
     
@@ -322,7 +330,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
     for iteration in range(args.n):
         accepted = 0
         #start = datetime.now()
-        est_root, est_death_m, est_sig2, est_q, est_a = est_root_A+0, est_death_m_A+0, est_sig2_A+0, est_q_A+0, est_a_A+0
+        est_root, est_ext, est_sig2, est_q, est_a = est_root_A+0, est_ext_A+0, est_sig2_A+0, est_q_A+0, est_a_A+0
         x_augmented, simTraj_all = x_augmented_A+0, simTraj_all_A+0
         h1,h2,h3 = 0,0,0
         accept = 0
@@ -333,20 +341,22 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
             accept = 0
             
         else: 
-            x_augmented, simTraj_all = get_imputations(Nobs, x, est_root, np.exp(est_sig2), n_samples=n_DA_samples)
+            x_augmented, simTraj_all = get_imputations(Nobs, x, est_root, est_ext, np.exp(est_sig2), n_samples=n_DA_samples)
             update = 0
             accept = 1
         
         if update:
             if rr[2]< 0.7:
-                est_root, h1 = update_normal(est_root_A , m=age_oldest_obs_occ, M=max_age, d=args.ws[0])
+                est_root, h1a = update_normal(est_root_A , m=age_oldest_obs_occ, M=max_age, d=args.ws[0])
+                est_ext, h1b = update_normal(est_ext_A , m=0, M=age_youngest_obs_occ, d=args.ws[0])
+                h1 = h1a + h1b
             if rr[2]> 0.5:
                 est_sig2EXP, h2 = update_multiplier(np.exp(est_sig2_A),args.ws[1])
                 est_sig2 = np.log(est_sig2EXP)
                 est_q   , h3 = update_multiplier(est_q_A ,d=args.ws[2])
                 if q_var_model:
                     est_a, _ = np.abs(update_normal(est_a_A, d=1, m= -100, M=100))
-            x_augmented, simTraj_all = get_imputations(Nobs, x, est_root, np.exp(est_sig2), n_samples=n_DA_samples)
+            x_augmented, simTraj_all = get_imputations(Nobs, x, est_root, est_ext, np.exp(est_sig2), n_samples=n_DA_samples)
             accept = 0
         
         
@@ -357,6 +367,7 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
     
         if (lik-lik_A) + (prior-prior_A) + (h1+h2+h3) >= np.log(np.random.random()) or accept==1 and np.isfinite(lik):
             est_root_A = est_root
+            est_ext_A = est_ext
             est_sig2_A = est_sig2
             est_q_A    = est_q
             est_a_A    = est_a
@@ -367,23 +378,24 @@ def run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_n = 0):
     
         if iteration % args.p == 0 and verbose:
             if iteration == 0:
-                print("%s\t%s\t%s\t%s\t%s\t%s" % ("it", "lik", "root", "sig2", "q_rate", "q_slope"))
-            print("%s\t%s\t%s\t%s\t%s\t%s" % (iteration, round(lik_A,2), round(est_root_A,2), round(est_sig2_A,2), round(est_q_A,5), round(est_a_A,5)))
+                print("%s\t%s\t%s\t%s\t%s\t%s\t%s" % ("it", "lik", "root", "ext", "sig2", "q_rate", "q_slope"))
+            print("%s\t%s\t%s\t%s\t%s\t%s\t%s" % (iteration, round(lik_A,2), round(est_root_A,2), round(est_ext_A,2), round(est_sig2_A,2), round(est_q_A,5), round(est_a_A,5)))
         
         if iteration % args.s == 0:
             if save_mcmc_samples:
                 if run_simulations:
-                    text_str = "\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % \
-                    ( iteration, lik_A+prior_A, lik_A, prior_A, Nobs, np.sum(x), age_oldest_obs_occ, true_root, np.median(true_q), \
+                    text_str = "\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % \
+                    ( iteration, lik_A+prior_A, lik_A, prior_A, Nobs, np.sum(x), age_oldest_obs_occ, age_youngest_obs_occ, true_root, true_ext, \
+                    np.median(true_q), \
                     #true_sig2, DA_counts, age_oldest_obs_occ*(1+est_root_A), est_q_A, est_sig2_A)
-                    true_sig2, DA_counts, est_root_A, est_q_A, est_a_A, est_sig2_A)
+                    true_sig2, DA_counts, est_root_A, est_ext_A, est_q_A, est_a_A, est_sig2_A)
                 else:
                     text_str = "\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % \
-                    ( iteration, lik_A+prior_A, lik_A, prior_A, Nobs, np.sum(x), age_oldest_obs_occ,DA_counts, est_root_A, est_q_A, est_a_A, est_sig2_A)
+                    ( iteration, lik_A+prior_A, lik_A, prior_A, Nobs, np.sum(x), age_oldest_obs_occ,DA_counts, est_root_A,est_ext_A, est_q_A, est_a_A, est_sig2_A)
                 logfile.writelines(text_str)
                 logfile.flush()
             
-            res[sampled_iteration,:] = np.array([lik_A, est_root_A, est_q_A, est_sig2_A])
+            res[sampled_iteration,:] = np.array([lik_A, est_root_A, est_ext_A, est_q_A, est_sig2_A])
             sampled_iteration += 1
     return res
 
@@ -507,7 +519,7 @@ def simulate_extinct_clade(rseed=0):
             print(indx_clade_life_span)
     
     return true_root, true_ext, true_q, true_sig2, Nobs, age_oldest_obs_occ, x, log_Nobs, Ntrue, age_youngest_obs_occ
-
+    
 if run_simulations:
     save_summary = 1
     if save_summary:
@@ -534,6 +546,7 @@ if run_simulations:
         else:
             true_root, true_q, true_sig2, Nobs, age_oldest_obs_occ, x, log_Nobs,Ntrue = simulate_data(seed+sim_number)
             age_youngest_obs_occ = 0
+            true_ext = 0
         
         indx_clade_life_span = np.array([i for i in range(len(mid_points)) if mid_points[i] < true_root])
         
@@ -572,7 +585,7 @@ if run_simulations:
     
             print("replicate:", sim_number)
             print("N. fossils:",np.sum(x),"Obs age:", age_oldest_obs_occ)
-            res=run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, sim_number)
+            res=run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_number)
 
             post_burnin_res = res[ int(res.shape[0]*0.2):, : ]
 
