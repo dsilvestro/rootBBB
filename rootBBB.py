@@ -19,6 +19,7 @@ p.add_argument('-plot',     type=int,   help='plot simulated Brownian bridge', d
 p.add_argument('-seed',     type=int,   help='random seed', default = -1)
 p.add_argument('-verbose',  type=int,   help='verbose', default = 1)
 p.add_argument('-sim',      type=int,   help='if >1 run simulations', default = 0)
+p.add_argument('-sim_extinct', type=int,  help='0: simulate extant clades; 1: simulate extinct clades', default = 0)
 p.add_argument('-biased_q', type=int,   help='if 1 set increasing q through time', default = 0)
 p.add_argument('-freq_q0',  type=float, help='frequency of 0-sampling rate', default = 0.1)
 p.add_argument('-q_var',    type=int,   help='0) constant q 1) linearly increasing q', default = 0)
@@ -67,7 +68,7 @@ increasing_q_rates = args.biased_q
 freq_zero_preservation = args.freq_q0
 bias_exp = args.q_exp
 
-simulate_extinct = 1
+simulate_extinct = args.sim_extinct
 
 
 run_simulations = np.min([1,n_simulations])
