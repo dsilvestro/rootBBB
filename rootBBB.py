@@ -405,7 +405,7 @@ def simulate_data(rseed=0):
         np.random.seed(rseed)
     age_oldest_obs_occ = 0
     while age_oldest_obs_occ <= 0:    
-        true_root = np.random.uniform(10,180)
+        true_root = np.random.uniform(10,max_age)
         log_q_mean = -8.52 # 1/5000 mean Nfossil 
         log_q_std = 1
 
@@ -457,7 +457,7 @@ def simulate_extinct_clade(rseed=0):
     age_oldest_obs_occ = 0
     age_youngest_obs_occ = 0
     while age_oldest_obs_occ <= 0:    
-        true_root = np.random.uniform(100,180)
+        true_root = np.random.uniform(100,max_age)
         true_ext = np.random.uniform(10,true_root*0.9)
         true_root_shifted = true_root - true_ext
         log_q_mean = -5 #-8.52 # 1/5000 mean Nfossil 
@@ -475,49 +475,52 @@ def simulate_extinct_clade(rseed=0):
                                            positive=0)
         Ntrue = np.rint(Ntrue)+1 # add +1 to make the bridge start at 1
         m = np.min(Ntrue,axis=1)
-        # print(m)
-        Ntrue = Ntrue[m>=1][0]
+        try:
+            # print(m)
+            Ntrue = Ntrue[m>=1][0]
         
-        # Shift div traj
-        Ntrue = np.append(np.zeros(np.min(indx_clade_life_span)), Ntrue)
+            # Shift div traj
+            Ntrue = np.append(np.zeros(np.min(indx_clade_life_span)), Ntrue)
         
-        #Ntrue[Ntrue==0] = 1
-        logNtrue = 0
-        true_sig2 = np.log(true_sig2)
+            #Ntrue[Ntrue==0] = 1
+            logNtrue = 0
+            true_sig2 = np.log(true_sig2)
         
-        # simulate fossil occs
-        true_q = np.exp( np.random.normal(log_q_mean,log_q_std,len(mid_points)))[0:len(Ntrue)]
-        if increasing_q_rates:
-            true_q = np.random.choice(true_q,len(true_q),replace=0,p=(true_q**bias_exp)/np.sum((true_q**bias_exp)))    
-            #true_q = np.sort(true_q)[::-1] # rate increases toward the recent
+            # simulate fossil occs
+            true_q = np.exp( np.random.normal(log_q_mean,log_q_std,len(mid_points)))[0:len(Ntrue)]
+            if increasing_q_rates:
+                true_q = np.random.choice(true_q,len(true_q),replace=0,p=(true_q**bias_exp)/np.sum((true_q**bias_exp)))    
+                #true_q = np.sort(true_q)[::-1] # rate increases toward the recent
         
-        true_q = true_q * np.random.binomial(1,1-freq_zero_preservation,len(true_q))
-        true_q[true_q>0.1] = 0.1
-        # preserved occs
-        x = np.rint(Ntrue*true_q)[::-1] # order is temporarily reversed
-        # remove first x values if they are == 0
-        j,c=0,0
-        for i in range(len(x)):
-            if x[i]==0 and j==0:
-                c+=1
+            true_q = true_q * np.random.binomial(1,1-freq_zero_preservation,len(true_q))
+            true_q[true_q>0.1] = 0.1
+            # preserved occs
+            x = np.rint(Ntrue*true_q)[::-1] # order is temporarily reversed
+            # remove first x values if they are == 0
+            j,c=0,0
+            for i in range(len(x)):
+                if x[i]==0 and j==0:
+                    c+=1
+                else:
+                    break
+        
+            x = x[c:][::-1]
+        
+            age_oldest_obs_occ = mid_points[len(x)-1]+0
+            if len(x):
+                age_youngest_obs_occ = mid_points[np.min(np.where(x > 0))] 
             else:
-                break
+                age_youngest_obs_occ = np.nan
         
-        x = x[c:][::-1]
-        
-        age_oldest_obs_occ = mid_points[len(x)-1]+0
-        if len(x):
-            age_youngest_obs_occ = mid_points[np.min(np.where(x > 0))] 
-        else:
-            age_youngest_obs_occ = np.nan
-        
-        if verbose:
-            print(x)
-            print("true_root",true_root, "obs_root",age_oldest_obs_occ)
-            print("true_ext",true_ext, "obs_ext",age_youngest_obs_occ)
-            # print("true_q (log10)",np.log10(true_q+0.000000001), np.max(true_q)/np.min(true_q[true_q>0]))
-            print( "Ntrue", Ntrue, "Nfossils",np.sum(x))
-            print(indx_clade_life_span)
+            if verbose:
+                print(x)
+                print("true_root",true_root, "obs_root",age_oldest_obs_occ)
+                print("true_ext",true_ext, "obs_ext",age_youngest_obs_occ)
+                # print("true_q (log10)",np.log10(true_q+0.000000001), np.max(true_q)/np.min(true_q[true_q>0]))
+                print( "Ntrue", Ntrue, "Nfossils",np.sum(x))
+                print(indx_clade_life_span)
+        except:
+            pass
     
     return true_root, true_ext, true_q, true_sig2, Nobs, age_oldest_obs_occ, x, log_Nobs, Ntrue, age_youngest_obs_occ
     
