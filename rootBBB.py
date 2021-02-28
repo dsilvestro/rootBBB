@@ -248,14 +248,16 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
     while np.isnan(lik_A):
         est_a_A = 0.
         est_ext_A = 0. # ext age multiplier of age_youngest_obs_occ \in (0, 1)
+        if tries % 100 == 0: 
+            print("Attempt", tries)
         
         if tries <= 100:
-            print("Attempt 1...")
+            # print("Attempt 1...")
             # init root age
             #est_root_A = np.random.random()
             est_root_A = age_oldest_obs_occ*(1+np.random.uniform(0.05,0.25 ))
             # init sig2
-            est_sig2_A = np.log(1 + np.random.uniform(10, 50)*np.max(1, Nobs))
+            est_sig2_A = np.log(1 + np.random.uniform(10, 50)*np.max([1, Nobs]))
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
             x_augmented_A, simTraj_all_A = get_imputations(Nobs, x, est_root_A, est_ext_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
@@ -266,13 +268,13 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
                 lik_A, DA_counts = get_avg_likelihood(Nobs, x, est_root_A, np.exp(est_sig2_A), est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
                 #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
                 prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=1.1,b=1) + gamma_pdf(est_a_A,1,0.01) 
-        if tries <= 200:
-            print("Attempt 2...")
+        elif tries <= 200:
+            # print("Attempt 2...")
             # init root age
             #est_root_A = np.random.random()
             est_root_A = age_oldest_obs_occ*(1+np.random.uniform(0.05,0.25 ))
             # init sig2
-            est_sig2_A = np.log(np.random.uniform(0, 5)*np.max(1, Nobs))
+            est_sig2_A = np.log(np.random.uniform(0, 5)*np.max([1, Nobs]))
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
             x_augmented_A, simTraj_all_A = get_imputations(Nobs, x, est_root_A, est_ext_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
@@ -283,13 +285,13 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
                 lik_A, DA_counts = get_avg_likelihood(Nobs, x, est_root_A, np.exp(est_sig2_A), est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
                 #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
                 prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=1.1,b=1) + gamma_pdf(est_a_A,1,0.01) 
-        elif tries <= 1000:
-            print("Attempt 3...")
+        elif tries <= 10000:
+            # print("Attempt 3...")
             est_root_A =  age_oldest_obs_occ*(1+np.random.uniform(0.05,1 ))
             # init sig2
-            est_sig2_A = np.log(np.random.uniform(1, 100)*np.max(1, Nobs))
+            est_sig2_A = np.log(np.random.uniform(0.1, 100)*np.max([1, Nobs]))
             # init q_rate
-            est_q_A = np.random.uniform(0.0005, 0.002)
+            est_q_A = np.random.uniform(0.0005, 0.1)
 
             x_augmented_A, simTraj_all_A = get_imputations(Nobs, x, est_root_A, est_ext_A, np.exp(est_sig2_A), n_samples=n_DA_samples)
             if len(x_augmented_A)==0:
@@ -391,8 +393,8 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
                     #true_sig2, DA_counts, age_oldest_obs_occ*(1+est_root_A), est_q_A, est_sig2_A)
                     true_sig2, DA_counts, est_root_A, est_ext_A, est_q_A, est_a_A, est_sig2_A)
                 else:
-                    text_str = "\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % \
-                    ( iteration, lik_A+prior_A, lik_A, prior_A, Nobs, np.sum(x), age_oldest_obs_occ,DA_counts, est_root_A,est_ext_A, est_q_A, est_a_A, est_sig2_A)
+                    text_str = "\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % \
+                    ( iteration, lik_A+prior_A, lik_A, prior_A, Nobs, np.sum(x), age_oldest_obs_occ, age_youngest_obs_occ,DA_counts, est_root_A,est_ext_A, est_q_A, est_a_A, est_sig2_A)
                 logfile.writelines(text_str)
                 logfile.flush()
             
@@ -642,6 +644,7 @@ else:
     
         x = get_fossil_count(x)
         age_oldest_obs_occ = mid_points[len(x)-1]
+        age_youngest_obs_occ = mid_points[0]
         Nfoss  = int(np.sum(x))
         log_Nobs = np.log(Nobs)
     
@@ -650,9 +653,10 @@ else:
         x_augmented = 0+x
 
         if np.sum(x)< 1: 
-            print("No fossils:",np.sum(x),age_oldest_obs_occ)
+            print("No fossils:",np.sum(x),age_oldest_obs_occ, age_youngest_obs_occ)
         else:
-            print("N. fossils:",np.sum(x),age_oldest_obs_occ)
-            res=run_mcmc(age_oldest_obs_occ, x, log_Nobs, Nobs, taxon)
+            print("N. fossils:",np.sum(x),age_oldest_obs_occ, age_youngest_obs_occ)
+            res=run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, taxon)
+            
         
 "python3 rootBBB.py -sim 1 -seed 5962 -p 10"
