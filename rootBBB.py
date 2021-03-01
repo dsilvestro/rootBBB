@@ -248,6 +248,8 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
     while np.isnan(lik_A):
         est_a_A = 0.
         est_ext_A = 0. # ext age multiplier of age_youngest_obs_occ \in (0, 1)
+        if Nobs == 0:
+            est_ext_A = np.random.uniform(age_youngest_obs_occ,0) 
         if tries % 100 == 0: 
             print("Attempt", tries)
         
@@ -351,7 +353,8 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
         if update:
             if rr[2]< 0.7:
                 est_root, h1a = update_normal(est_root_A , m=age_oldest_obs_occ, M=max_age, d=args.ws[0])
-                est_ext, h1b = update_normal(est_ext_A , m=0, M=age_youngest_obs_occ, d=args.ws[0])
+                if Nobs == 0:
+                    est_ext, h1b = update_normal(est_ext_A , m=0, M=age_youngest_obs_occ, d=args.ws[0])
                 h1 = h1a + h1b
             if rr[2]> 0.5:
                 est_sig2EXP, h2 = update_multiplier(np.exp(est_sig2_A),args.ws[1])
