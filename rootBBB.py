@@ -651,7 +651,12 @@ else:
         x_0 = 1
         n_samples = len(mid_points)-len(x)
         x_augmented = 0+x
-
+        
+        print(Nobs, x_augmented)
+        if Nobs < x_augmented[0]:
+            e = "Modern diversity is lower than sampled diversity at most recent time bin. Consider using smaller timebins."
+            sys.exit(e)
+        
         if np.sum(x)< 1: 
             print("No fossils:",np.sum(x),age_oldest_obs_occ, age_youngest_obs_occ)
         else:
