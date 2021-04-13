@@ -633,11 +633,11 @@ else:
     if args.clade_name != "":
         taxa_list = np.array([i for i in taxa_list if args.clade_name in i])
     
-    print("Analyzing", len(taxa_list), "clades:")
-    print(taxa_list)
+    print("Found", len(taxa_list), "clades:")
+    print(taxa_list[0:5], "...")
     
     for taxon in taxa_list:
-        print("parsing data...", taxon)
+        print("\nParsing data...", taxon)
     
         Nobs = int(diversity_table[diversity_table[:,0]==taxon,1])
 
@@ -648,7 +648,10 @@ else:
         age_oldest_obs_occ = mid_points[len(x)-1]
         age_youngest_obs_occ = mid_points[0]
         Nfoss  = int(np.sum(x))
-        log_Nobs = np.log(Nobs)
+        if Nobs:
+            log_Nobs = np.log(Nobs)
+        else:
+            log_Nobs = 0
     
         x_0 = 1
         n_samples = len(mid_points)-len(x)
