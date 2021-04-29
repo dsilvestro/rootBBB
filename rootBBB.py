@@ -257,7 +257,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             # print("Attempt 1...")
             # init root age
             #est_root_A = np.random.random()
-            est_root_A = age_oldest_obs_occ*(1+np.random.uniform(0.05,0.25 ))
+            est_root_A = np.min([age_oldest_obs_occ*(1+np.random.uniform(0.05,0.25 )), max_age])
             # init sig2
             est_sig2_A = np.log(1 + np.random.uniform(10, 50)*np.max([1, Nobs]))
             # init q_rate
@@ -274,7 +274,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             # print("Attempt 2...")
             # init root age
             #est_root_A = np.random.random()
-            est_root_A = age_oldest_obs_occ*(1+np.random.uniform(0.05,0.25 ))
+            est_root_A = np.min([age_oldest_obs_occ*(1+np.random.uniform(0.05,0.25 )), max_age])
             # init sig2
             est_sig2_A = np.log(np.random.uniform(0, 5)*np.max([1, Nobs]))
             # init q_rate
@@ -289,7 +289,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
                 prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=1.1,b=1) + gamma_pdf(est_a_A,1,0.01) 
         elif tries <= 10000:
             # print("Attempt 3...")
-            est_root_A =  age_oldest_obs_occ*(1+np.random.uniform(0.05,1 ))
+            est_root_A =  np.min([age_oldest_obs_occ*(1+np.random.uniform(0.05,1 )), max_age])
             # init sig2
             est_sig2_A = np.log(np.random.uniform(0.1, 100)*np.max([1, Nobs]))
             # init q_rate
