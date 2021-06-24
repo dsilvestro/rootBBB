@@ -646,7 +646,7 @@ else:
     
         x = get_fossil_count(x)
         age_oldest_obs_occ = mid_points[len(x)-1]
-        age_youngest_obs_occ = mid_points[0]
+        age_youngest_obs_occ = np.min(mid_points[np.where(x > 0)[0]])
         Nfoss  = int(np.sum(x))
         if Nobs:
             log_Nobs = np.log(Nobs)
@@ -665,7 +665,7 @@ else:
         if np.sum(x)< 1: 
             print("No fossils:",np.sum(x),age_oldest_obs_occ, age_youngest_obs_occ)
         else:
-            print("N. fossils:",np.sum(x),age_oldest_obs_occ, age_youngest_obs_occ)
+            print("N. fossils:",np.sum(x),"age_oldest_obs_occ:",age_oldest_obs_occ, "age_oldest_obs_occ:",age_youngest_obs_occ)
             res=run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, taxon)
             
         
