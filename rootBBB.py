@@ -34,6 +34,7 @@ p.add_argument('-DAbatch',  type=int,   help='DA batch size (if set to 0: auto-t
 p.add_argument('-ws',       type=float, help='win sizes root, sig2, q', default = [10,1.25,1.25], nargs=3)
 p.add_argument('-max_age',  type=int,   help='Max boundary of uniform prior on the root age', default = 300)
 p.add_argument('-q_prior',  type=float,   help='shape and rate (default: 1.1, 1)', default = [1.1, 1], nargs=2)
+p.add_argument('-q_min',    type=float,   help='offset for q', default = 0)
 
 
 
@@ -66,6 +67,7 @@ if DAbatch == 0:
     DAbatch += n_DA_samples
 q_var_model = args.q_var
 [alpha_q, beta_q] = args.q_prior
+q_offset = args.q_min
 
 # simulation settings
 increasing_q_rates = args.biased_q
@@ -380,6 +382,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
                 est_sig2EXP, h2 = update_multiplier(np.exp(est_sig2_A),args.ws[1])
                 est_sig2 = np.log(est_sig2EXP)
                 est_q   , h3 = update_multiplier(est_q_A ,d=args.ws[2])
+                est_q += q_offset
                 if q_var_model:
                     est_a, _ = np.abs(update_normal(est_a_A, d=1, m= -100, M=100))
             x_augmented, simTraj_all = get_imputations(Nobs, x, est_root, est_ext, np.exp(est_sig2), 
