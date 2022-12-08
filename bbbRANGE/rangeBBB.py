@@ -2,15 +2,14 @@ from datetime import datetime
 import sys
 import argparse
 import numpy as np
-np.set_printoptions(suppress=True)
-np.set_printoptions(precision=3)  
+np.set_printoptions(suppress=True, precision=3)  
 import scipy.stats
 from matplotlib import pyplot
 import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf
 
 p = argparse.ArgumentParser()
-p.add_argument('-fossil_data',type=str,   help='table with fossil counts per bin', default = "")
+p.add_argument('-fadlad_data',type=str,   help='table with fossil counts per bin', default = "")
 p.add_argument('-div_table' ,type=str,   help='table with present diversity per lineage', default = "")
 p.add_argument('-n',        type=int,   help='n. MCMC iterations', default = 25000)
 p.add_argument('-s',        type=int,   help='sampling freq', default = 100)
