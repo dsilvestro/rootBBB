@@ -1,6 +1,6 @@
 import numpy as np
 import sys, os
-np.random.seed(1234)
+np.set_printoptions(suppress=True, precision=3)  
 
 ##########################################################################
 ###########                 SIMULATION SETTINGS                 ##########
@@ -49,6 +49,10 @@ scale=100.
 def trans_rate_linear(l0,gl,D):
     #print l0,D,max(0.0001, l0+l0*(gl/270. * (D-s_species)))
     return max(0.0000001, l0+l0*(gl * D))
+
+def getDT(T,s,e): # returns the Diversity Trajectory of s,e at times T
+    return np.array([len(s[s>t])-len(s[e>t]) for t in T])
+
 
 def get_DT(T,s,e): # returns the Diversity Trajectory of s,e at times T (x10 faster)
     B=np.sort(np.append(T,T[0]+1))+.0001
@@ -213,5 +217,6 @@ def run_sim(sim=0):
     return FAtrue, LOtrue
 
 if __name__ == '__main__': 
+    np.random.seed(1234)
     for sim in range(n_reps):
         run_sim(sim)

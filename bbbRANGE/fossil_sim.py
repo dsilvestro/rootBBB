@@ -5,7 +5,7 @@ import numpy as np
 import os
 import glob
 import scipy
-np.random.seed(1234)
+np.set_printoptions(suppress=True, precision=3)  
 
 def write_to_file(f, o):
     sumfile = open(f , "w") 
@@ -19,12 +19,8 @@ def print_update(s):
 
 
 output_wd = ""
-
-
-direct="%s/sim*.txt" % output_wd
-files=glob.glob(direct)
-files=sort(files)
-
+bin_size = 1.
+max_root = 40
 min_q, max_q = 0.005, 0.05
 # epochs + early/mid/late Miocene
 rate_shifts = np.array([0, 
@@ -108,17 +104,31 @@ def fossilize(ts, te, min_q, max_q, rate_shifts):
             sp_names.append("sp_%s" % sp_i)
     return sim_record, sim_record_LR, sp_names
 
-
+def getDT_equalbin(T,s,e): 
+    B=np.sort(np.append(T,T[0]+1))+.0001
+    bin_size= abs(T[0]-T[1])
+    ss1 = np.histogram(s,bins=B)[0]
+    e[s==e] -= bin_size
+    ee2 = np.histogram(e,bins=B)[0]
+    DD=(ss1-ee2)[::-1]
+    return np.cumsum(DD)[0:len(T)] 
 
 def get_fad_lad(fossils):
     fadlad_tbl = np.zeros((len(fossils), 2))
     for i in range(len(fossils)):
         fadlad_tbl[i, 0] = np.max(fossils[i])
-        fadlad_tbl[i, 1] = np.min(fossils[i])
-        
+        fadlad_tbl[i, 1] = np.min(fossils[i])        
     return fadlad_tbl
 
+def get_fossil_count(T, s, e):
+    B=np.sort(np.append(T,T[0]+1))+.0001
+    ss1 = np.histogram(s,bins=B)[0]
+    ee1 = np.histogram(e[e != s],bins=B)[0]
+    return (ss1 + ee1)[::-1]
+    
+
 if __name__ == '__main__': 
+    # np.random.seed(1234)
     from bd_sim import *
     ts, te = run_sim()
     # print("ts", ts)
@@ -127,6 +137,16 @@ if __name__ == '__main__':
     # write_pyrate_input(sim_record, sim_record_LR, sp_names)
     tbl = get_fad_lad(sim_record)
     print(tbl)
+    # get range-through trajectory
+    n_bins = np.floor(max_root / bin_size) + 1
+    time_bins = np.linspace(0, max_root, int(n_bins))[::-1]
+    range_through_traj = getDT_equalbin(time_bins, tbl[:,0], tbl[:,1])
+    print(range_through_traj) # min boundary for BB
+    fossil_count = get_fossil_count(time_bins, tbl[:,0], tbl[:,1])
+    print(fossil_count)
+    
+    
+    
     
     #TODO: histogram per species to get range-through diversity and fossils per time bin
 
