@@ -19,6 +19,7 @@ p.add_argument('-seed',     type=int,   help='random seed', default = -1)
 p.add_argument('-verbose',  type=int,   help='verbose', default = 1)
 p.add_argument('-sim',      type=int,   help='if >1 run simulations', default = 0)
 p.add_argument('-sim_extinct', type=int,  help='0: simulate extant clades; 1: simulate extinct clades', default = 0)
+p.add_argument('-sim_range', type=int,  help='0: simulate extant clades; 1: simulate extinct clades', default = 0)
 p.add_argument('-biased_q', type=int,   help='if 1 set increasing q through time', default = 0)
 p.add_argument('-freq_q0',  type=float, help='frequency of 0-sampling rate', default = 0.1)
 p.add_argument('-q_var',    type=int,   help='0) constant q 1) linearly increasing q', default = 0)
@@ -74,7 +75,7 @@ freq_zero_preservation = args.freq_q0
 bias_exp = args.q_exp
 
 simulate_extinct = args.sim_extinct
-
+run_range_simulations = args.sim_range
 
 run_simulations = np.min([1,n_simulations])
 
@@ -250,9 +251,11 @@ def get_avg_likelihood(Nobs, fossil_data, est_root, est_sig2, est_q, est_a, x_au
         #quit()
         return lik_avg, len(lik_i[np.exp(lik_i-lik_max)>0])
 
-def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n = 0, DAbatch=DAbatch):
+def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n = 0, DAbatch=DAbatch, bbb_condition=None):
     lik_A = np.nan
     tries = 0
+    if bbb_condition is None:
+        bbb_condition = x + 0 
     # initialize MCMC
     print("\n\nInitializing the model...")
     while np.isnan(lik_A):
@@ -273,7 +276,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             est_sig2_A = np.log(1 + np.random.uniform(10, 50)*np.max([1, Nobs]))
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
-            x_augmented_A, simTraj_all_A = get_imputations(Nobs, x, est_root_A, est_ext_A, np.exp(est_sig2_A), 
+            x_augmented_A, simTraj_all_A = get_imputations(Nobs, bbb_condition, est_root_A, est_ext_A, np.exp(est_sig2_A), 
                                                            n_samples=n_DA_samples,
                                                            DAbatch=DAbatch)
             if len(x_augmented_A)==0:
@@ -292,7 +295,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             est_sig2_A = np.log(np.random.uniform(0, 5)*np.max([1, Nobs]))
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.002)
-            x_augmented_A, simTraj_all_A = get_imputations(Nobs, x, est_root_A, est_ext_A, np.exp(est_sig2_A), 
+            x_augmented_A, simTraj_all_A = get_imputations(Nobs, bbb_condition, est_root_A, est_ext_A, np.exp(est_sig2_A), 
                                                            n_samples=n_DA_samples,
                                                            DAbatch=DAbatch)
                                                             
@@ -311,7 +314,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             # init q_rate
             est_q_A = np.random.uniform(0.0005, 0.1)
 
-            x_augmented_A, simTraj_all_A = get_imputations(Nobs, x, est_root_A, est_ext_A, np.exp(est_sig2_A),
+            x_augmented_A, simTraj_all_A = get_imputations(Nobs, bbb_condition, est_root_A, est_ext_A, np.exp(est_sig2_A),
                                                            n_samples=n_DA_samples,
                                                            DAbatch=DAbatch)
             
@@ -366,7 +369,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             accept = 0
             
         else: 
-            x_augmented, simTraj_all = get_imputations(Nobs, x, est_root, est_ext, np.exp(est_sig2), 
+            x_augmented, simTraj_all = get_imputations(Nobs, bbb_condition, est_root, est_ext, np.exp(est_sig2), 
                                                        n_samples=n_DA_samples,
                                                        DAbatch=DAbatch)
             update = 0
@@ -384,7 +387,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
                 est_q += q_offset
                 if q_var_model:
                     est_a, _ = np.abs(update_normal(est_a_A, d=1, m= -100, M=100))
-            x_augmented, simTraj_all = get_imputations(Nobs, x, est_root, est_ext, np.exp(est_sig2), 
+            x_augmented, simTraj_all = get_imputations(Nobs, bbb_condition, est_root, est_ext, np.exp(est_sig2), 
                                                        n_samples=n_DA_samples,
                                                        DAbatch=DAbatch)
             
@@ -554,7 +557,7 @@ def simulate_extinct_clade(rseed=0):
     
     return true_root, true_ext, true_q, true_sig2, Nobs, age_oldest_obs_occ, x, log_Nobs, Ntrue, age_youngest_obs_occ
     
-if run_simulations:
+if run_simulations and run_range_simulations == 0:
     save_summary = 1
     if save_summary:
         out_name = "%s/summary.txt" % (args.outpath)
@@ -619,6 +622,7 @@ if run_simulations:
     
             print("replicate:", sim_number)
             print("N. fossils:",np.sum(x),"Obs age:", age_oldest_obs_occ)
+            print("x vector:", x)
             res=run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_number)
 
             post_burnin_res = res[ int(res.shape[0]*0.2):, : ]
@@ -638,6 +642,49 @@ if run_simulations:
             
             sim_number += 1
         # quit()
+elif run_range_simulations:
+    from bd_sim import *
+    from fossil_sim import *
+    print("seed",seed)
+    init_seed = seed + 0
+
+    sim_number = 1
+    counter = 0
+    while sim_number <= n_simulations:
+        counter += 1
+        print(counter, sim_number)
+    
+        ts, te = run_sim()
+        res = generate_bbb_data(ts, te,
+                          bin_size=1.,
+                          max_root=0,
+                          q_range=[0.005, 0.05],
+                          rate_shifts=None)
+        # {
+        #         'ts': ts,
+        #         'te': te,
+        #         'n_bins': n_bins,
+        #         'time_bins': time_bins,
+        #         'range_through_traj': range_through_traj,
+        #         'fossil_count': fossil_count,
+        #         'n_extant': len(te[te == 0]),
+        #         'oldest_occ': np.max(tbl)
+        #         'youngest_occ': np.max(tbl)
+        #     }
+        print('fossil_count', res['fossil_count'])
+        print('range_through_traj', res['range_through_traj'])
+        quit()
+        
+        """
+        run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n = 0, DAbatch=DAbatch)
+        """
+        
+        bbb_res=run_mcmc(age_oldest_obs_occ=res['oldest_occ'], 
+                         age_youngest_obs_occ=res['youngest_occ'], 
+                         x=x, # fossil data (fad/lad)
+                         log_Nobs=np.log(np.max([1, res['n_extant']])), 
+                         Nobs=res['n_extant'], 
+                         sim_n=sim_number)
 
 else:
     ### EMPIRICAL ANALYSES
