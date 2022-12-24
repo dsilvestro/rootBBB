@@ -6,42 +6,7 @@ np.set_printoptions(suppress=True, precision=3)
 ###########                 SIMULATION SETTINGS                 ##########
 ##########################################################################
 
-n_reps = 1 # number of simulations
 
-# CONSTRAINTS on DATA SIZE (simulations will run until size requirements are met)
-s_species=1   # number of starting species
-minSP=50     # min size data set
-maxSP=300     # max size data set
-minEX_SP=0    # minimum number of extinct lineages allowed
-
-# SETTINGS for BD-SHIFT SIMULATIONS
-root_age = 30
-shift_speciation = [20]      # specify times of rate shifts (speciation)
-shift_extinction = [3.5]       # specify times of rate shifts (extinction)
-speciation_rates = [0.4,0.2] # if using rate shifts, the first rate is that closest to the root age
-extinction_rates = [0.05,0.5] # 
-
-# SETTINGS for DIVERSITY DEPENDENT SIMULATIONS
-useDD = 0 # set to 1 to use model diversity dependence
-baseline_speciation_rate = [1.5] # Baseline rates are the initial rates when diversity = 0. 
-baseline_extinction_rate = [0.1] # The following transformation is applied for rate at a given 
-DDl = -0.02                       # diversity D (DD parameters for speciation and extinction are DDl and DDm,
-DDm =  0.02                       # respectively): rate_D = max(0, baseline_rate + baseline_rate * (DDl * D))
-
-# SETTINGS for RANDOM SIMULATIONS
-randomSettings = 1 # set to 1 to use random settings (see below)
-poiL = 4          # expected number of shifts (if 0: constant rate BD; if -1 use empirical Prob vec)
-poiM = 4          # expected number of shifts (if 0: constant rate BD; if -1 use empirical Prob vec)
-root_r=np.array([30.,30.]) # range root ages
-minL,maxL = 0.4 , 0.6
-minM,maxM = 0.2 , 0.3
-# To assign specific probabilities to the random birth-death configurations
-# you can define the probabilities through probability vectors
-# (these are not used unless 'poiL = -1' and/or 'poiL = -1'): 
-p_vec_l = np.array([0.569,0.254,0.136,0.040]) # the first value of the array represents the Pr of a 
-p_vec_m = np.array([0.440,0.343,0.189,0.029]) # constant rate model
-
-scale=100.
 
 
 #################### SIMULATION  FUNCTIONS #########################################
@@ -121,10 +86,12 @@ def write_to_file(f, o):
     sumfile.writelines(o)
     sumfile.close()
 
-def get_random_settings(root,poiL,poiM):
+def get_random_settings(root,poiL,poiM, rangeL, rangeM):
     root=abs(root)
     timesL_temp= [ root,0.]
     timesM_temp= [ root,0.]
+    [minL, maxL] = rangeL
+    [minM, maxM] = rangeM
     
     if poiL==-1: nL = random_choice_P(p_vec_l)[1]
     elif poiL==0: nL = 0 
@@ -167,7 +134,42 @@ def random_choice_P(vector):
 #         print("%s\t%s\t%s" % (i,l_temp,m_temp))
 #     print("\n\n")
 
-def run_sim(sim=0):
+def run_sim(sim=0,
+            n_reps = 1, # number of simulations
+            # CONSTRAINTS on DATA SIZE (simulations will run until size requirements are met)
+            s_species=1,   # number of starting species
+            rangeSP=[50, 300],     # min/max size data set
+            minEX_SP=0,    # minimum number of extinct lineages allowed
+            # SETTINGS for BD-SHIFT SIMULATIONS
+            root_age = None,
+            shift_speciation = [20],      # specify times of rate shifts (speciation)
+            shift_extinction = [3.5],       # specify times of rate shifts (extinction)
+            speciation_rates = [0.4,0.2], # if using rate shifts, the first rate is that closest to the root age
+            extinction_rates = [0.05,0.5], # 
+            # SETTINGS for DIVERSITY DEPENDENT SIMULATIONS
+            useDD = 0, # set to 1 to use model diversity dependence
+            baseline_speciation_rate = [1.5], # Baseline rates are the initial rates when diversity = 0. 
+            baseline_extinction_rate = [0.1], # The following transformation is applied for rate at a given 
+            DDl = -0.02,                       # diversity D (DD parameters for speciation and extinction are DDl and DDm,
+            DDm =  0.02,                       # respectively): rate_D = max(0, baseline_rate + baseline_rate * (DDl * D))
+            # SETTINGS for RANDOM SIMULATIONS
+            randomSettings = 1, # set to 1 to use random settings (see below)
+            poiL = 4,         # expected number of shifts (if 0: constant rate BD; if -1 use empirical Prob vec)
+            poiM = 4,          # expected number of shifts (if 0: constant rate BD; if -1 use empirical Prob vec)
+            root_r=np.array([60,30.]), # range root ages
+            rangeL = [0.2 , 0.4],
+            rangeM = [0.2 , 0.4],
+            # To assign specific probabilities to the random birth-death configurations
+            # you can define the probabilities through probability vectors
+            # (these are not used unless 'poiL = -1' and/or 'poiL = -1'): 
+            p_vec_l = np.array([0.569,0.254,0.136,0.040]), # the first value of the array represents the Pr of a 
+            p_vec_m = np.array([0.440,0.343,0.189,0.029]), # constant rate model
+            scale=100.,
+            seed=0):
+            
+    [minL, maxL] = rangeL
+    [minM, maxM] = rangeM
+    [minSP, maxSP] = rangeSP
     i=0
     LOtrue,i=[0],0
     n_extinct=-0
@@ -178,8 +180,12 @@ def run_sim(sim=0):
             clade = 0
         if i % 10==0: # if it doesn't get the right range of species in 5 attempts, draw new rates (+shifts)
             if randomSettings==1:
-                root = -np.random.uniform( np.min(root_r), np.max(root_r)) # ROOT AGES
-                timesL,timesM,L,M = get_random_settings(root,poiL,poiM)
+                if root_age is None:
+                    root = -np.random.uniform( np.min(root_r), np.max(root_r)) # ROOT AGES
+                else:
+                    root = -root_age
+                timesL,timesM,L,M = get_random_settings(root,poiL,poiM, rangeL, rangeM)
+                L[0] = M[0] * 2
             else:
                 timesL = np.sort(np.array([float(root_age),0.]+shift_speciation))[::-1]
                 timesM = np.sort(np.array([float(root_age),0.]+shift_extinction))[::-1]

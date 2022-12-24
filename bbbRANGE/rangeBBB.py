@@ -35,6 +35,7 @@ p.add_argument('-ws',       type=float, help='win sizes root, sig2, q', default 
 p.add_argument('-max_age',  type=int,   help='Max boundary of uniform prior on the root age', default = 300)
 p.add_argument('-q_prior',  type=float,   help='shape and rate (default: 1.1, 1)', default = [1.1, 1], nargs=2)
 p.add_argument('-q_min',    type=float,   help='offset for q', default = 0)
+p.add_argument('-debug', type=int,  help='1: debug mode', default = 0)
 
 
 
@@ -78,6 +79,8 @@ simulate_extinct = args.sim_extinct
 run_range_simulations = args.sim_range
 
 run_simulations = np.min([1,n_simulations])
+
+DEBUG = args.debug
 
 def print_update(s):
     sys.stdout.write('\r')
@@ -191,9 +194,13 @@ def sample_path_batch_discrete(time_bins = np.arange(100), n_reps = 1, y_start =
 def get_imputations(Nobs, fossil_data, est_root_r, est_ext, est_sig2, n_samples=1000, DAbatch=1000):    
     est_root = est_root_r - est_ext
     mid_points_shift = mid_points[mid_points < est_root_r] 
+    if DEBUG:
+        print(mid_points_shift, len(mid_points_shift))
+        print(est_root_r)
+        print(fossil_data, len(fossil_data))
     
     x_augmented = np.zeros(len(mid_points_shift))
-    x_augmented[0:len(fossil_data)] = fossil_data+0    
+    x_augmented[0:len(fossil_data)] = fossil_data + 0    
     
     x_augmented = x_augmented[mid_points_shift > est_ext]
     mid_points_shift = mid_points_shift[mid_points_shift > est_ext]
@@ -623,6 +630,9 @@ if run_simulations and run_range_simulations == 0:
             print("replicate:", sim_number)
             print("N. fossils:",np.sum(x),"Obs age:", age_oldest_obs_occ)
             print("x vector:", x)
+            print(len(x))
+            
+            
             res=run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_number)
 
             post_burnin_res = res[ int(res.shape[0]*0.2):, : ]
@@ -642,6 +652,7 @@ if run_simulations and run_range_simulations == 0:
             
             sim_number += 1
         # quit()
+
 elif run_range_simulations:
     from bd_sim import *
     from fossil_sim import *
@@ -653,13 +664,19 @@ elif run_range_simulations:
     while sim_number <= n_simulations:
         counter += 1
         print(counter, sim_number)
-    
-        ts, te = run_sim()
+        root_age=np.random.uniform(30,60)
+        
+        ts, te = run_sim( #root_age=root_age,
+                         rangeSP=[200, 4000]
+                        )
+                        
         res = generate_bbb_data(ts, te,
-                          bin_size=1.,
-                          max_root=0,
-                          q_range=[0.005, 0.05],
-                          rate_shifts=None)
+                          bin_size=bin_size,
+                          time_bins=mid_points,
+                          max_root=root_age,
+                          q_range=[q_offset + 0.00005, q_offset + 0.005],
+                          rate_shifts=None,
+                          debug=DEBUG)
         # {
         #         'ts': ts,
         #         'te': te,
@@ -671,20 +688,81 @@ elif run_range_simulations:
         #         'oldest_occ': np.max(tbl)
         #         'youngest_occ': np.max(tbl)
         #     }
-        print('fossil_count', res['fossil_count'])
-        print('range_through_traj', res['range_through_traj'])
-        quit()
+        if DEBUG: 
+            print('fossil_count', res['fossil_count'])
+            print('range_through_traj', res['range_through_traj'])
+            print(res['range_through_traj'] - res['fossil_count'])
+        
+        if args.plot:
+            # mid_points_temp = res['time_bins']
+            mid_points_temp = mid_points[mid_points <= np.max(res['ts'])]
+            Ntrue = res['true_range_through_traj'][:len(mid_points_temp)]
+            Nrange_through = res['range_through_traj'][:len(mid_points_temp)]
+            Nobs = res['n_extant']
+            x = res['fossil_count']
+
+            file_name = "%s/sim_data_range_%s_%s.pdf" % (args.outpath,sim_number,seed)
+            fig = plt.figure(figsize=(12, 10))
+            if DEBUG:
+                print("\n\n", mid_points_temp.shape,mid_points_temp[0:(len(Ntrue)+3)].shape, len(Ntrue))
+            plt.plot(mid_points_temp[0:len(Ntrue)],Ntrue.T)
+            plt.plot(mid_points_temp[0:len(Nrange_through)],Nrange_through.T)
+            
+            plt.plot(mid_points_temp[np.where(x > 0)], x[x > 0], 'ro')
+            for i in range(len(mid_points_temp)):
+                plt.text( mid_points_temp[i] - (1 / 150 * np.max(res['ts'])),
+                                -0.035 * np.max(Ntrue), '%d' % (int(x[i])))
+            
+            plt.plot(np.zeros(int(Nobs)), np.arange(Nobs), 'ro')
+            
+            title = "n. extant species: %s   n. fossils: %s " % (int(Nobs), int(np.sum(x)))
+            plt.gca().set_title(title,  fontsize=16)
+            plt.xlabel('Time',  fontsize=14)
+            plt.ylabel('N. species',  fontsize=14)
+            plt.close()
+            plot_divtraj = matplotlib.backends.backend_pdf.PdfPages(file_name)        
+            plot_divtraj.savefig( fig )
+            plot_divtraj.close()
+        
+        
+        
+        if np.min(res['range_through_traj'] - res['fossil_count']) < 0:
+            sys.exit("\nIncompatible bbb_condition!\n")
         
         """
         run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n = 0, DAbatch=DAbatch)
         """
+        true_root = np.max(res['ts'])
+        true_ext = np.min(res['te'])
+        true_q = res['avg_q']
+        true_sig2 = 0
+        indx_clade_life_span = np.array([i for i in range(len(mid_points)) if mid_points[i] < true_root])
+        
+        f = res['fossil_count']
+        max_obs_ind = np.max(np.where(f > 0)[0])
+        age_oldest_obs_occ = res['oldest_occ']
+        print("true_root",true_root, "obs_root",age_oldest_obs_occ)
+        
+        # z = np.zeros(max_obs_ind)
+        # x = z + 0
+        # x[:len(z)] = 0
+        x = res['fossil_count'][:max_obs_ind]
+        # bbb_condition = z + 0
+        # bbb_condition[:len(res['fossil_count'])] = res['range_through_traj']
+        bbb_condition = res['range_through_traj'][:max_obs_ind]
+
+        if DEBUG:
+            print(len(x))
+            print(len(bbb_condition))
         
         bbb_res=run_mcmc(age_oldest_obs_occ=res['oldest_occ'], 
                          age_youngest_obs_occ=res['youngest_occ'], 
                          x=x, # fossil data (fad/lad)
                          log_Nobs=np.log(np.max([1, res['n_extant']])), 
                          Nobs=res['n_extant'], 
-                         sim_n=sim_number)
+                         sim_n=sim_number,
+                         bbb_condition=bbb_condition)
+        sim_number +=1
 
 else:
     ### EMPIRICAL ANALYSES

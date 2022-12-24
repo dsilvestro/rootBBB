@@ -17,29 +17,6 @@ def print_update(s):
     sys.stdout.write(s)
     sys.stdout.flush()
 
-
-output_wd = ""
-bin_size = 1.
-max_root = 40
-min_q, max_q = 0.005, 0.05
-# epochs + early/mid/late Miocene
-rate_shifts = np.array([0, 
-                        2.58,
-                        # 3.6,
-                        5.333,
-                        # 7.246,
-                        11.63,
-                        # 13.82,
-                        15.97,
-                        # 20.44,
-                        23.03,
-                        # 28.1,
-                        33.9])[::-1]
-                        
-
-rate_shifts_sorted = np.sort(rate_shifts)
-lower_res = True
-
 def write_pyrate_input(sim_record, sim_record_LR, sp_names, filename="test"):
         data = "#!/usr/bin/env python\nfrom numpy import * \n\n"
         d = "\nd=[sim_data]"
@@ -69,6 +46,7 @@ def write_pyrate_input(sim_record, sim_record_LR, sp_names, filename="test"):
 
 def fossilize(ts, te, min_q, max_q, rate_shifts):
     rates = np.random.uniform(min_q, max_q, len(rate_shifts))
+    rate_shifts_sorted = np.sort(rate_shifts)
     sim_record = []
     sim_record_LR = []
     sp_names = []
@@ -102,17 +80,43 @@ def fossilize(ts, te, min_q, max_q, rate_shifts):
             sim_record.append(x)
             sim_record_LR.append(low_res_x)
             sp_names.append("sp_%s" % sp_i)
-    return sim_record, sim_record_LR, sp_names
+    return sim_record, sim_record_LR, sp_names, np.mean(rates)
 
 def getDT_equalbin(T,s,e): 
+    # T = np.sort(T)
+    # return np.array([len(s[s>t])-len(s[e>t]) for t in T])
     B=np.sort(np.append(T,T[0]+1))+.0001
     bin_size= abs(T[0]-T[1])
     ss1 = np.histogram(s,bins=B)[0]
-    e[s==e] -= bin_size
+    # e[s==e] -= bin_size
     ee2 = np.histogram(e,bins=B)[0]
     DD=(ss1-ee2)[::-1]
-    return np.cumsum(DD)[0:len(T)] 
+    # print("DIVERSITY")
+    # print(np.cumsum(DD)[0:len(T)][::-1])
+    
+    T = np.sort(T)
+    counts = []
+    for i in range(1, len(T)):
+        e_tmp = np.zeros(len(e))
+        s_tmp = np.zeros(len(e))
+        e_tmp[e > T[i-1]] = 1
+        e_tmp[e > T[i]] = 0
+        s_tmp[s > T[i-1]] = 1
+        s_tmp[s > T[i]] = 0
+        s_tmp[e_tmp == 1] = 0
+        
+        sampled_in_bin = np.sum(s_tmp) + np.sum(e_tmp)
+        
+        e_tmp = np.zeros(len(e))
+        s_tmp = np.zeros(len(e))
+        e_tmp[e <= T[i - 1]] = 1
+        s_tmp[s > T[i]] = 1
+        sampled_in_bin += np.sum(s_tmp * e_tmp)
+        counts.append(sampled_in_bin)
 
+    # print(np.array(counts).astype(int))
+    return np.array(counts).astype(int)
+    
 def get_fad_lad(fossils):
     fadlad_tbl = np.zeros((len(fossils), 2))
     for i in range(len(fossils)):
@@ -121,13 +125,93 @@ def get_fad_lad(fossils):
     return fadlad_tbl
 
 def get_fossil_count(T, s, e):
-    B=np.sort(np.append(T,T[0]+1))+.0001
-    ss1 = np.histogram(s,bins=B)[0]
-    ee1 = np.histogram(e[e != s],bins=B)[0]
-    return (ss1 + ee1)[::-1]
+    T = np.sort(T)
+    counts = []
+    for i in range(1, len(T)):
+        e_tmp = np.zeros(len(e))
+        s_tmp = np.zeros(len(e))
+        e_tmp[e > T[i-1]] = 1
+        e_tmp[e > T[i]] = 0
+        s_tmp[s > T[i-1]] = 1
+        s_tmp[s > T[i]] = 0
+        s_tmp[e_tmp == 1] = 0 # count singletons only once
+        counts.append(np.sum(s_tmp) + np.sum(e_tmp))
+
+    return np.array(counts).astype(int)
     
+def generate_bbb_data(ts, te,
+                      bin_size=1.,
+                      time_bins=None,
+                      max_root=0,
+                      q_range=[0.005, 0.05],
+                      rate_shifts=None,
+                      debug=False,
+                      ):
+    true_root = np.max(ts)
+    if max_root < true_root:
+        max_root = true_root + bin_size * 5
+    if rate_shifts is None:
+        rate_shifts = np.linspace(0, max_root, np.random.poisson(10))[::-1]
+        
+    [min_q, max_q] = q_range
+    sim_record, sim_record_LR, sp_names, avg_q = fossilize(ts, te, min_q, max_q, rate_shifts)
+    tbl = get_fad_lad(sim_record)
+    # get range-through trajectory
+    
+    if time_bins is None:
+        time_bins = np.linspace(0, true_root, int(n_bins)) #[::-1]
+        n_bins = np.floor(max_root / bin_size) + 1
+    else:
+        n_bins = len(time_bins)
+    range_through_traj = getDT_equalbin(time_bins, tbl[:,0], tbl[:,1])
+    true_range_through_traj = getDT_equalbin(time_bins, ts, te)
+    fossil_count = get_fossil_count(time_bins, tbl[:,0], tbl[:,1])
+    if debug:
+        print(tbl)
+        print(fossil_count)
+        print("time_bins", time_bins)
+        print(range_through_traj) # min boundary for BB
+    res = {
+        'ts': ts,
+        'te': te,
+        'n_bins': n_bins,
+        'time_bins': time_bins,
+        'range_through_traj': range_through_traj,
+        'fossil_count': fossil_count,
+        'n_extant': len(te[te == 0]),
+        'oldest_occ': np.max(tbl),
+        'fadlad_tbl': tbl,
+        'youngest_occ': np.max(tbl),
+        'true_range_through_traj': true_range_through_traj,
+        'avg_q': avg_q
+        
+    }
+    return(res)
 
 if __name__ == '__main__': 
+    
+
+    output_wd = ""
+    bin_size = 1.
+    max_root = 40
+    min_q, max_q = 0.005, 0.05
+    # epochs + early/mid/late Miocene
+    rate_shifts = np.array([0, 
+                            2.58,
+                            # 3.6,
+                            5.333,
+                            # 7.246,
+                            11.63,
+                            # 13.82,
+                            15.97,
+                            # 20.44,
+                            23.03,
+                            # 28.1,
+                            33.9])[::-1]
+                        
+
+    rate_shifts_sorted = np.sort(rate_shifts)
+    lower_res = True
     # np.random.seed(1234)
     from bd_sim import *
     ts, te = run_sim()
