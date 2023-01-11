@@ -152,47 +152,54 @@ def generate_bbb_data(ts, te,
                       freq_zero_preservation=0,
                       debug=False,
                       ):
-    true_root = np.max(ts)
-    if max_root < true_root:
-        max_root = true_root + bin_size * 5
-    if rate_shifts is None:
-        rate_shifts = np.linspace(0, max_root, 2 + np.random.poisson(avg_n_q_rate_shifts))[::-1] # +2 to ensure the boundaries are included
-        
-    [min_q, max_q] = q_range
-    sim_record, sim_record_LR, sp_names, q_rates = fossilize(ts, te, min_q, max_q, rate_shifts, freq_zero_preservation)
-    tbl = get_fad_lad(sim_record)
-    # get range-through trajectory
+    fossil_count = np.zeros(2)
     
-    if time_bins is None:
-        time_bins = np.linspace(0, true_root, int(n_bins)) #[::-1]
-        n_bins = np.floor(max_root / bin_size) + 1
-    else:
-        n_bins = len(time_bins)
-    range_through_traj = getDT_equalbin(time_bins, tbl[:,0], tbl[:,1])
-    true_range_through_traj = getDT_equalbin(time_bins, ts, te)
-    fossil_count = get_fossil_count(time_bins, tbl[:,0], tbl[:,1])
-    if debug:
-        print(tbl)
-        print(fossil_count)
-        print("time_bins", time_bins)
-        print(range_through_traj) # min boundary for BB
-        print('q_rates', q_rates)
-    res = {
-        'ts': ts,
-        'te': te,
-        'n_bins': n_bins,
-        'time_bins': time_bins,
-        'range_through_traj': range_through_traj,
-        'fossil_count': fossil_count,
-        'n_extant': len(te[te == 0]),
-        'oldest_occ': np.max(tbl),
-        'fadlad_tbl': tbl,
-        'youngest_occ': np.max(tbl),
-        'true_range_through_traj': true_range_through_traj,
-        'avg_q': np.mean(q_rates),
-        'q_rates': q_rates
+    while len(fossil_count[fossil_count > 0]) < 2: # fossils in at least 2 bins
+        true_root = np.max(ts)
+        if max_root < true_root:
+            max_root = true_root + bin_size * 5
+        if rate_shifts is None:
+            rate_shifts = np.linspace(0, max_root, 2 + np.random.poisson(avg_n_q_rate_shifts))[::-1] # +2 to ensure the boundaries are included
         
-    }
+        [min_q, max_q] = q_range
+        sim_record, sim_record_LR, sp_names, q_rates = fossilize(ts, te, min_q, max_q, rate_shifts, freq_zero_preservation)
+        tbl = get_fad_lad(sim_record)
+        # get range-through trajectory
+    
+        if time_bins is None:
+            time_bins = np.linspace(0, true_root, int(n_bins)) #[::-1]
+            n_bins = np.floor(max_root / bin_size) + 1
+        else:
+            n_bins = len(time_bins)
+        range_through_traj = getDT_equalbin(time_bins, tbl[:,0], tbl[:,1])
+        true_range_through_traj = getDT_equalbin(time_bins, ts, te)
+        fossil_count = get_fossil_count(time_bins, tbl[:,0], tbl[:,1])
+        if debug:
+            print(tbl)
+            print("len(fossil_count[fossil_count > 0])", len(fossil_count[fossil_count > 0]))
+            print(fossil_count)
+            print("time_bins", time_bins)
+            print(range_through_traj) # min boundary for BB
+            print('q_rates', q_rates)
+        try:
+            res = {
+                'ts': ts,
+                'te': te,
+                'n_bins': n_bins,
+                'time_bins': time_bins,
+                'range_through_traj': range_through_traj,
+                'fossil_count': fossil_count,
+                'n_extant': len(te[te == 0]),
+                'oldest_occ': np.max(tbl),
+                'fadlad_tbl': tbl,
+                'youngest_occ': np.min(tbl),
+                'true_range_through_traj': true_range_through_traj,
+                'avg_q': np.mean(q_rates),
+                'q_rates': q_rates
+        
+            }
+        except:
+            pass
     return(res)
 
 if __name__ == '__main__': 

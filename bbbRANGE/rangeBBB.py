@@ -196,7 +196,7 @@ def get_imputations(Nobs, fossil_data, est_root_r, est_ext, est_sig2, n_samples=
     mid_points_shift = mid_points[mid_points < est_root_r] 
     if DEBUG:
         print(mid_points_shift, len(mid_points_shift))
-        print(est_root_r)
+        print(est_root_r, est_ext)
         print(fossil_data, len(fossil_data))
     
     x_augmented = np.zeros(len(mid_points_shift))
@@ -204,6 +204,8 @@ def get_imputations(Nobs, fossil_data, est_root_r, est_ext, est_sig2, n_samples=
     
     x_augmented = x_augmented[mid_points_shift > est_ext]
     mid_points_shift = mid_points_shift[mid_points_shift > est_ext]
+    if DEBUG:
+        print("mid_points_shift", est_ext)
     
     time_bins = mid_points_shift
     simTraj_all = np.zeros((n_samples,len(time_bins)))
@@ -665,7 +667,7 @@ elif run_range_simulations:
     avg_n_q_rate_shifts=10 # if =0 -> constant preservation
     rangeL = [0.1, 0.4]
     rangeM = [0.1, 0.4]
-    q_range = np.array([0.00005, 0.005]) + q_offset
+    q_range = np.array([0.0001, 0.01]) + q_offset
     #---------------------------#
     
     sim_number = 1
@@ -757,6 +759,11 @@ elif run_range_simulations:
         max_obs_ind = np.max(np.where(f > 0)[0])
         age_oldest_obs_occ = res['oldest_occ']
         print("true_root",true_root, "obs_root",age_oldest_obs_occ)
+        print("true_ext",true_ext, "obs_ext",res['youngest_occ'])
+        print("n. fossils", np.sum(res['fossil_count']))
+        print("n. sampled taxa", res['fadlad_tbl'].shape[0], "\nn. true taxa", len(res['ts']))
+        print("n. singleton taxa", 
+              np.sum(res['fadlad_tbl'][:,0] == res['fadlad_tbl'][:,1]) - np.sum(res['fadlad_tbl'][:,1] == 0))
         
         # z = np.zeros(max_obs_ind)
         # x = z + 0
@@ -769,6 +776,7 @@ elif run_range_simulations:
         if DEBUG:
             print(len(x))
             print(len(bbb_condition))
+            print('Nobs', res['n_extant'])
         
         bbb_res=run_mcmc(age_oldest_obs_occ=res['oldest_occ'], 
                          age_youngest_obs_occ=res['youngest_occ'], 
