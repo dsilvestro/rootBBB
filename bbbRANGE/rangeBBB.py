@@ -658,25 +658,37 @@ elif run_range_simulations:
     from fossil_sim import *
     print("seed",seed)
     init_seed = seed + 0
-
+    
+    #-- simulation parameters --#
+    root_age_range = np.array([100, 30.])
+    n_sp_range = np.array([200, 4000])
+    avg_n_q_rate_shifts=10 # if =0 -> constant preservation
+    rangeL = [0.1, 0.4]
+    rangeM = [0.1, 0.4]
+    q_range = np.array([0.00005, 0.005]) + q_offset
+    #---------------------------#
+    
     sim_number = 1
     counter = 0
     while sim_number <= n_simulations:
         counter += 1
         print(counter, sim_number)
-        root_age=np.random.uniform(30,60)
         
-        ts, te = run_sim( #root_age=root_age,
-                         rangeSP=[200, 4000]
+        ts, te = run_sim(#root_age=root_age,
+                         root_r=root_age_range,    
+                         rangeSP=n_sp_range,
+                         rangeL=rangeL,
+                         rangeM=rangeM
                         )
-                        
+                    
         res = generate_bbb_data(ts, te,
-                          bin_size=bin_size,
-                          time_bins=mid_points,
-                          max_root=root_age,
-                          q_range=[q_offset + 0.00005, q_offset + 0.005],
-                          rate_shifts=None,
-                          debug=DEBUG)
+                                bin_size=bin_size,
+                                time_bins=mid_points,
+                                q_range=q_range,
+                                rate_shifts=None,
+                                avg_n_q_rate_shifts=avg_n_q_rate_shifts, 
+                                freq_zero_preservation=freq_zero_preservation,
+                                debug=DEBUG)
         # {
         #         'ts': ts,
         #         'te': te,
@@ -685,8 +697,11 @@ elif run_range_simulations:
         #         'range_through_traj': range_through_traj,
         #         'fossil_count': fossil_count,
         #         'n_extant': len(te[te == 0]),
-        #         'oldest_occ': np.max(tbl)
-        #         'youngest_occ': np.max(tbl)
+        #         'oldest_occ': np.max(tbl),
+        #         'youngest_occ': np.max(tbl),
+        #         'true_range_through_traj': true_range_through_traj,
+        #         'avg_q': np.mean(q_rates),
+        #         'q_rates': q_rates
         #     }
         if DEBUG: 
             print('fossil_count', res['fossil_count'])

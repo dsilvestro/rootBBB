@@ -157,8 +157,8 @@ def run_sim(sim=0,
             poiL = 4,         # expected number of shifts (if 0: constant rate BD; if -1 use empirical Prob vec)
             poiM = 4,          # expected number of shifts (if 0: constant rate BD; if -1 use empirical Prob vec)
             root_r=np.array([60,30.]), # range root ages
-            rangeL = [0.2 , 0.4],
-            rangeM = [0.2 , 0.4],
+            rangeL = [0.1 , 0.4],
+            rangeM = [0.1 , 0.4],
             # To assign specific probabilities to the random birth-death configurations
             # you can define the probabilities through probability vectors
             # (these are not used unless 'poiL = -1' and/or 'poiL = -1'): 

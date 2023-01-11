@@ -44,8 +44,11 @@ def write_pyrate_input(sim_record, sim_record_LR, sp_names, filename="test"):
         all_d=data+d+names+taxa_names+f
         write_to_file(os.path.join(output_wd, "%s_lr.py" % filename), all_d)     
 
-def fossilize(ts, te, min_q, max_q, rate_shifts):
+def fossilize(ts, te, min_q, max_q, rate_shifts, freq_zero_preservation):
     rates = np.random.uniform(min_q, max_q, len(rate_shifts))
+    if freq_zero_preservation:
+        rates = rates * np.random.binomial(1, 1-freq_zero_preservation, len(rates))
+    
     rate_shifts_sorted = np.sort(rate_shifts)
     sim_record = []
     sim_record_LR = []
@@ -80,7 +83,7 @@ def fossilize(ts, te, min_q, max_q, rate_shifts):
             sim_record.append(x)
             sim_record_LR.append(low_res_x)
             sp_names.append("sp_%s" % sp_i)
-    return sim_record, sim_record_LR, sp_names, np.mean(rates)
+    return sim_record, sim_record_LR, sp_names, rates
 
 def getDT_equalbin(T,s,e): 
     # T = np.sort(T)
@@ -145,16 +148,18 @@ def generate_bbb_data(ts, te,
                       max_root=0,
                       q_range=[0.005, 0.05],
                       rate_shifts=None,
+                      avg_n_q_rate_shifts=0,
+                      freq_zero_preservation=0,
                       debug=False,
                       ):
     true_root = np.max(ts)
     if max_root < true_root:
         max_root = true_root + bin_size * 5
     if rate_shifts is None:
-        rate_shifts = np.linspace(0, max_root, np.random.poisson(10))[::-1]
+        rate_shifts = np.linspace(0, max_root, 2 + np.random.poisson(avg_n_q_rate_shifts))[::-1] # +2 to ensure the boundaries are included
         
     [min_q, max_q] = q_range
-    sim_record, sim_record_LR, sp_names, avg_q = fossilize(ts, te, min_q, max_q, rate_shifts)
+    sim_record, sim_record_LR, sp_names, q_rates = fossilize(ts, te, min_q, max_q, rate_shifts, freq_zero_preservation)
     tbl = get_fad_lad(sim_record)
     # get range-through trajectory
     
@@ -171,6 +176,7 @@ def generate_bbb_data(ts, te,
         print(fossil_count)
         print("time_bins", time_bins)
         print(range_through_traj) # min boundary for BB
+        print('q_rates', q_rates)
     res = {
         'ts': ts,
         'te': te,
@@ -183,7 +189,8 @@ def generate_bbb_data(ts, te,
         'fadlad_tbl': tbl,
         'youngest_occ': np.max(tbl),
         'true_range_through_traj': true_range_through_traj,
-        'avg_q': avg_q
+        'avg_q': np.mean(q_rates),
+        'q_rates': q_rates
         
     }
     return(res)
