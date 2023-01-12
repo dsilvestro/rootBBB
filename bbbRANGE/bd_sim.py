@@ -165,6 +165,7 @@ def run_sim(sim=0,
             p_vec_l = np.array([0.569,0.254,0.136,0.040]), # the first value of the array represents the Pr of a 
             p_vec_m = np.array([0.440,0.343,0.189,0.029]), # constant rate model
             scale=100.,
+            print_ltt=True,
             seed=0):
             
     [minL, maxL] = rangeL
@@ -206,16 +207,18 @@ def run_sim(sim=0,
         n_extinct = len(LOtrue[LOtrue>0])
     print("\nSim %s:" % (sim))
     print("L", L, "M",M, "tL",timesL,"tM",timesM)
-    ltt=""
-    for i in range(int(np.max(FAtrue))):
-        n=len(FAtrue[FAtrue>i])-len(LOtrue[LOtrue>i])
-        #nlog=int((n))
-        ltt += "\n%s\t%s\t%s" % (i, n, "*"*n)
-    print(ltt)
-    #print "simulation:",i, "total no.", len(LOtrue),root
+    print(len(LOtrue),len(L),len(M))
+    
+    if print_ltt:
+        ltt=""
+        for i in range(int(np.max(FAtrue))):
+            n=len(FAtrue[FAtrue>i])-len(LOtrue[LOtrue>i])
+            #nlog=int((n))
+            ltt += "\n%s\t%s\t%s" % (i, n, "*"*n)
+        print(ltt)
+
     i += 1
 
-    print(len(LOtrue),len(L),len(M))
     o="clade\tspecies\tts\tte\n"
     for i in range(len(FAtrue)):
         o+= "%s\t%s\t%s\t%s\n" % (0,i+1,FAtrue[i],LOtrue[i])

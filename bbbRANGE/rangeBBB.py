@@ -565,62 +565,179 @@ def simulate_extinct_clade(rseed=0):
             pass
     
     return true_root, true_ext, true_q, true_sig2, Nobs, age_oldest_obs_occ, x, log_Nobs, Ntrue, age_youngest_obs_occ
+  
+
+if __name__ == '__main__':  
+    if run_simulations and run_range_simulations == 0:
+        save_summary = 1
+        if save_summary:
+            out_name = "%s/summary.txt" % (args.outpath)
+            logfile = open(out_name, "w") 
+            text_str = "iteration\tNobs\tNfossils\troot_true\troot_obs\tq_med_true\tsig2_true\troot_est\troot_M\troot_m\tq_est\tsig2_est"
+            logfile.writelines(text_str)
+
+        print("seed",seed)
+        init_seed = seed + 0
+
+        sim_number = 1
+        counter = 0
+        while sim_number <= n_simulations:
+            counter += 1
+            print(counter, sim_number)
+            if counter > 10000:
+                counter *= 0 
+        
+            print("simulating data...")
+            if simulate_extinct:
+                true_root, true_ext, true_q, true_sig2, Nobs, age_oldest_obs_occ, x, log_Nobs,Ntrue, age_youngest_obs_occ = simulate_extinct_clade(0)
+                # indx_clade_life_span = np.array([i for i in range(len(mid_points)) if mid_points[i] < true_root and mid_points[i] > true_ext])
+            else:
+                true_root, true_q, true_sig2, Nobs, age_oldest_obs_occ, x, log_Nobs,Ntrue = simulate_data(seed+sim_number)
+                age_youngest_obs_occ = 0
+                true_ext = 0
+        
+            indx_clade_life_span = np.array([i for i in range(len(mid_points)) if mid_points[i] < true_root])
+        
+            if np.sum(x)< 1: 
+                print("No fossils:",np.sum(x),"",age_oldest_obs_occ)
+                seed_s = "%s%s" % (counter, init_seed) # change seed if it doesn't work
+                seed = int(seed_s)
+            else:
+                if args.plot:
+                    mid_points_temp = mid_points[indx_clade_life_span]
+                    print("\n\nPLOTTING")
+                    print(x)
+                    print(indx_clade_life_span)
+                    print(len(x), len(mid_points_temp), len(mid_points), len(Ntrue.T))
+                    file_name = "%s/sim_data%s_%s.pdf" % (args.outpath,sim_number,seed)
+                    fig = plt.figure(figsize=(12, 10))
+                    plt.plot(mid_points[0:len(Ntrue)],Ntrue.T)
+                
+                
+                
+                    plt.plot(mid_points_temp[np.where(x > 0)],x[x > 0], 'ro')
+                    for i in range(len(x)):
+                        plt.text(mid_points_temp[i]-(1/150*true_root),-0.035*np.max(Ntrue), '%d' % (int(x[i])))
+                
+                    plt.plot(np.zeros(int(Nobs)),np.arange(Nobs), 'ro')
+                
+                    title = "n. extant species: %s   n. fossils: %s   $\sigma^{2} = 10^{%s}$   $q_{avg} = 10^{%s}$" % \
+                    (int(Nobs), int(np.sum(x)), np.round(np.log10(true_sig2),2), np.round(np.log10(np.mean(true_q)),2))
+                    plt.gca().set_title(title,  fontsize=16)
+                    plt.xlabel('Time',  fontsize=14)
+                    plt.ylabel('N. species',  fontsize=14)
+                    plt.close()
+                    plot_divtraj = matplotlib.backends.backend_pdf.PdfPages(file_name)        
+                    plot_divtraj.savefig( fig )
+                    plot_divtraj.close()
     
-if run_simulations and run_range_simulations == 0:
-    save_summary = 1
-    if save_summary:
-        out_name = "%s/summary.txt" % (args.outpath)
-        logfile = open(out_name, "w") 
-        text_str = "iteration\tNobs\tNfossils\troot_true\troot_obs\tq_med_true\tsig2_true\troot_est\troot_M\troot_m\tq_est\tsig2_est"
-        logfile.writelines(text_str)
+                print("replicate:", sim_number)
+                print("N. fossils:",np.sum(x),"Obs age:", age_oldest_obs_occ)
+                print("x vector:", x)
+                print(len(x))
+            
+            
+                res=run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_number)
 
-    print("seed",seed)
-    init_seed = seed + 0
+                post_burnin_res = res[ int(res.shape[0]*0.2):, : ]
 
-    sim_number = 1
-    counter = 0
-    while sim_number <= n_simulations:
-        counter += 1
-        print(counter, sim_number)
-        if counter > 10000:
-            counter *= 0 
+                par_est = np.mean(post_burnin_res, axis=0)
+                root_est_hpd = calcHPD(post_burnin_res[:,1])
+
+                if verbose:
+                    print(par_est, root_est_hpd)
+
+                if save_summary:
+                    text_str = "\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % \
+                    ( sim_number, Nobs, np.sum(x), true_root, age_oldest_obs_occ, np.median(true_q), \
+                    true_sig2, par_est[1], root_est_hpd[0], root_est_hpd[1], par_est[3], par_est[4])
+                    logfile.writelines(text_str)
+                    logfile.flush()
+            
+                sim_number += 1
+            # quit()
+
+    elif run_range_simulations:
+        from bd_sim import *
+        from fossil_sim import *
+        print("seed",seed)
+        init_seed = seed + 0
         
-        print("simulating data...")
-        if simulate_extinct:
-            true_root, true_ext, true_q, true_sig2, Nobs, age_oldest_obs_occ, x, log_Nobs,Ntrue, age_youngest_obs_occ = simulate_extinct_clade(0)
-            # indx_clade_life_span = np.array([i for i in range(len(mid_points)) if mid_points[i] < true_root and mid_points[i] > true_ext])
-        else:
-            true_root, true_q, true_sig2, Nobs, age_oldest_obs_occ, x, log_Nobs,Ntrue = simulate_data(seed+sim_number)
-            age_youngest_obs_occ = 0
-            true_ext = 0
+    
+        #-- simulation parameters --#
+        root_age_range = np.array([100, 30.])
+        n_sp_range = np.array([1000, 10000])
+        avg_n_q_rate_shifts=10 # if =0 -> constant preservation
+        rangeL = [0.1, 0.4]
+        rangeM = [0.1, 0.4]
+        q_range = np.array([0.0001, 0.01]) + q_offset
+        print_ltt = False
+        #---------------------------#
+    
+        sim_number = 1
+        counter = 0
+        while sim_number <= n_simulations:
+            counter += 1
+            print(counter, sim_number)
         
-        indx_clade_life_span = np.array([i for i in range(len(mid_points)) if mid_points[i] < true_root])
+            ts, te = run_sim(#root_age=root_age,
+                             root_r=root_age_range,    
+                             rangeSP=n_sp_range,
+                             rangeL=rangeL,
+                             rangeM=rangeM,
+                             print_ltt=print_ltt
+                            )
+                    
+            res = generate_bbb_data(ts, te,
+                                    bin_size=bin_size,
+                                    time_bins=mid_points,
+                                    q_range=q_range,
+                                    rate_shifts=None,
+                                    avg_n_q_rate_shifts=avg_n_q_rate_shifts, 
+                                    freq_zero_preservation=freq_zero_preservation,
+                                    debug=DEBUG)
+            # {
+            #         'ts': ts,
+            #         'te': te,
+            #         'n_bins': n_bins,
+            #         'time_bins': time_bins,
+            #         'range_through_traj': range_through_traj,
+            #         'fossil_count': fossil_count,
+            #         'n_extant': len(te[te == 0]),
+            #         'oldest_occ': np.max(tbl),
+            #         'youngest_occ': np.max(tbl),
+            #         'true_range_through_traj': true_range_through_traj,
+            #         'avg_q': np.mean(q_rates),
+            #         'q_rates': q_rates
+            #     }
+            if DEBUG: 
+                print('fossil_count', res['fossil_count'])
+                print('range_through_traj', res['range_through_traj'])
+                print(res['range_through_traj'] - res['fossil_count'])
         
-        if np.sum(x)< 1: 
-            print("No fossils:",np.sum(x),"",age_oldest_obs_occ)
-            seed_s = "%s%s" % (counter, init_seed) # change seed if it doesn't work
-            seed = int(seed_s)
-        else:
             if args.plot:
-                mid_points_temp = mid_points[indx_clade_life_span]
-                print("\n\nPLOTTING")
-                print(x)
-                print(indx_clade_life_span)
-                print(len(x), len(mid_points_temp), len(mid_points), len(Ntrue.T))
-                file_name = "%s/sim_data%s_%s.pdf" % (args.outpath,sim_number,seed)
+                # mid_points_temp = res['time_bins']
+                mid_points_temp = mid_points[mid_points <= np.max(res['ts'])]
+                Ntrue = res['true_range_through_traj'][:len(mid_points_temp)]
+                Nrange_through = res['range_through_traj'][:len(mid_points_temp)]
+                Nobs = res['n_extant']
+                x = res['fossil_count']
+
+                file_name = "%s/sim_data_range_%s_%s.pdf" % (args.outpath,sim_number,seed)
                 fig = plt.figure(figsize=(12, 10))
-                plt.plot(mid_points[0:len(Ntrue)],Ntrue.T)
-                
-                
-                
-                plt.plot(mid_points_temp[np.where(x > 0)],x[x > 0], 'ro')
-                for i in range(len(x)):
-                    plt.text(mid_points_temp[i]-(1/150*true_root),-0.035*np.max(Ntrue), '%d' % (int(x[i])))
-                
-                plt.plot(np.zeros(int(Nobs)),np.arange(Nobs), 'ro')
-                
-                title = "n. extant species: %s   n. fossils: %s   $\sigma^{2} = 10^{%s}$   $q_{avg} = 10^{%s}$" % \
-                (int(Nobs), int(np.sum(x)), np.round(np.log10(true_sig2),2), np.round(np.log10(np.mean(true_q)),2))
+                if DEBUG:
+                    print("\n\n", mid_points_temp.shape,mid_points_temp[0:(len(Ntrue)+3)].shape, len(Ntrue))
+                plt.plot(mid_points_temp[0:len(Ntrue)],Ntrue.T)
+                plt.plot(mid_points_temp[0:len(Nrange_through)],Nrange_through.T)
+            
+                plt.plot(mid_points_temp[np.where(x > 0)], x[x > 0], 'ro')
+                for i in range(len(mid_points_temp)):
+                    plt.text( mid_points_temp[i] - (1 / 150 * np.max(res['ts'])),
+                                    -0.035 * np.max(Ntrue), '%d' % (int(x[i])))
+            
+                plt.plot(np.zeros(int(Nobs)), np.arange(Nobs), 'ro')
+            
+                title = "n. extant species: %s   n. fossils: %s " % (int(Nobs), int(np.sum(x)))
                 plt.gca().set_title(title,  fontsize=16)
                 plt.xlabel('Time',  fontsize=14)
                 plt.ylabel('N. species',  fontsize=14)
@@ -628,222 +745,153 @@ if run_simulations and run_range_simulations == 0:
                 plot_divtraj = matplotlib.backends.backend_pdf.PdfPages(file_name)        
                 plot_divtraj.savefig( fig )
                 plot_divtraj.close()
-    
-            print("replicate:", sim_number)
-            print("N. fossils:",np.sum(x),"Obs age:", age_oldest_obs_occ)
-            print("x vector:", x)
-            print(len(x))
-            
-            
-            res=run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_number)
-
-            post_burnin_res = res[ int(res.shape[0]*0.2):, : ]
-
-            par_est = np.mean(post_burnin_res, axis=0)
-            root_est_hpd = calcHPD(post_burnin_res[:,1])
-
-            if verbose:
-                print(par_est, root_est_hpd)
-
-            if save_summary:
-                text_str = "\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % \
-                ( sim_number, Nobs, np.sum(x), true_root, age_oldest_obs_occ, np.median(true_q), \
-                true_sig2, par_est[1], root_est_hpd[0], root_est_hpd[1], par_est[2], par_est[3])
-                logfile.writelines(text_str)
-                logfile.flush()
-            
-            sim_number += 1
-        # quit()
-
-elif run_range_simulations:
-    from bd_sim import *
-    from fossil_sim import *
-    print("seed",seed)
-    init_seed = seed + 0
-    
-    #-- simulation parameters --#
-    root_age_range = np.array([100, 30.])
-    n_sp_range = np.array([200, 4000])
-    avg_n_q_rate_shifts=10 # if =0 -> constant preservation
-    rangeL = [0.1, 0.4]
-    rangeM = [0.1, 0.4]
-    q_range = np.array([0.0001, 0.01]) + q_offset
-    #---------------------------#
-    
-    sim_number = 1
-    counter = 0
-    while sim_number <= n_simulations:
-        counter += 1
-        print(counter, sim_number)
         
-        ts, te = run_sim(#root_age=root_age,
-                         root_r=root_age_range,    
-                         rangeSP=n_sp_range,
-                         rangeL=rangeL,
-                         rangeM=rangeM
-                        )
-                    
-        res = generate_bbb_data(ts, te,
-                                bin_size=bin_size,
-                                time_bins=mid_points,
-                                q_range=q_range,
-                                rate_shifts=None,
-                                avg_n_q_rate_shifts=avg_n_q_rate_shifts, 
-                                freq_zero_preservation=freq_zero_preservation,
-                                debug=DEBUG)
-        # {
-        #         'ts': ts,
-        #         'te': te,
-        #         'n_bins': n_bins,
-        #         'time_bins': time_bins,
-        #         'range_through_traj': range_through_traj,
-        #         'fossil_count': fossil_count,
-        #         'n_extant': len(te[te == 0]),
-        #         'oldest_occ': np.max(tbl),
-        #         'youngest_occ': np.max(tbl),
-        #         'true_range_through_traj': true_range_through_traj,
-        #         'avg_q': np.mean(q_rates),
-        #         'q_rates': q_rates
-        #     }
-        if DEBUG: 
-            print('fossil_count', res['fossil_count'])
-            print('range_through_traj', res['range_through_traj'])
-            print(res['range_through_traj'] - res['fossil_count'])
         
-        if args.plot:
-            # mid_points_temp = res['time_bins']
-            mid_points_temp = mid_points[mid_points <= np.max(res['ts'])]
-            Ntrue = res['true_range_through_traj'][:len(mid_points_temp)]
-            Nrange_through = res['range_through_traj'][:len(mid_points_temp)]
-            Nobs = res['n_extant']
-            x = res['fossil_count']
+        
+            if np.min(res['range_through_traj'] - res['fossil_count']) < 0:
+                sys.exit("\nIncompatible bbb_condition!\n")
+        
+            """
+            run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n = 0, DAbatch=DAbatch)
+            """
+            true_root = np.max(res['ts'])
+            true_ext = np.min(res['te'])
+            true_q = res['avg_q']
+            true_sig2 = 0
+            indx_clade_life_span = np.array([i for i in range(len(mid_points)) if mid_points[i] < true_root])
+        
+            f = res['fossil_count']
+            max_obs_ind = np.max(np.where(f > 0)[0])
+            age_oldest_obs_occ = res['oldest_occ']
+            age_youngest_obs_occ = res['youngest_occ']
+            n_singleton_taxa = np.sum(res['fadlad_tbl'][:,0] == res['fadlad_tbl'][:,1]) - np.sum(res['fadlad_tbl'][:,1] == 0)
+            n_sampled_taxa = res['fadlad_tbl'].shape[0]
+            n_true_taxa = len(res['ts'])
+            n_fossils = np.sum(res['fossil_count'])
+            
+            print("true_root",true_root, "obs_root", age_oldest_obs_occ)
+            print("true_ext",true_ext, "obs_ext", age_youngest_obs_occ)
+            print("n. fossils", n_fossils)
+            print("n. sampled taxa", n_sampled_taxa, "\nn. true taxa", n_true_taxa)
+            print("n. singleton taxa", n_singleton_taxa)
+        
+            # z = np.zeros(max_obs_ind)
+            # x = z + 0
+            # x[:len(z)] = 0
+            x = res['fossil_count'][:max_obs_ind]
+            # bbb_condition = z + 0
+            # bbb_condition[:len(res['fossil_count'])] = res['range_through_traj']
+            bbb_condition = res['range_through_traj'][:max_obs_ind]
 
-            file_name = "%s/sim_data_range_%s_%s.pdf" % (args.outpath,sim_number,seed)
-            fig = plt.figure(figsize=(12, 10))
             if DEBUG:
-                print("\n\n", mid_points_temp.shape,mid_points_temp[0:(len(Ntrue)+3)].shape, len(Ntrue))
-            plt.plot(mid_points_temp[0:len(Ntrue)],Ntrue.T)
-            plt.plot(mid_points_temp[0:len(Nrange_through)],Nrange_through.T)
+                print(len(x))
+                print(len(bbb_condition))
+                print('Nobs', res['n_extant'])
+        
+            bbb_res=run_mcmc(age_oldest_obs_occ=age_oldest_obs_occ, 
+                             age_youngest_obs_occ=age_youngest_obs_occ, 
+                             x=x, # fossil data (fad/lad)
+                             log_Nobs=np.log(np.max([1, res['n_extant']])), 
+                             Nobs=res['n_extant'], 
+                             sim_n=sim_number,
+                             bbb_condition=bbb_condition)
             
-            plt.plot(mid_points_temp[np.where(x > 0)], x[x > 0], 'ro')
-            for i in range(len(mid_points_temp)):
-                plt.text( mid_points_temp[i] - (1 / 150 * np.max(res['ts'])),
-                                -0.035 * np.max(Ntrue), '%d' % (int(x[i])))
+            #--  simulations summary  --#
+            save_summary = 1
+            if sim_number == 1:
+                out_name = "%s/summary_bbbrange.txt" % (args.outpath)
+                logfile = open(out_name, "w") 
+                text_str = "iteration\tNobs\tNfossils\tNfossil_species\tNsingleton\tNtrue_species"
+                text_str = text_str + "\troot_true\troot_obs\text_true\text_obs\tq_med_true\tsig2_true"
+                text_str = text_str + "\troot_est\troot_m\troot_M"
+                text_str = text_str + "\text_est\text_m\text_M"
+                text_str = text_str + "\tq_est\tsig2_est"
+                logfile.writelines(text_str)
             
-            plt.plot(np.zeros(int(Nobs)), np.arange(Nobs), 'ro')
-            
-            title = "n. extant species: %s   n. fossils: %s " % (int(Nobs), int(np.sum(x)))
-            plt.gca().set_title(title,  fontsize=16)
-            plt.xlabel('Time',  fontsize=14)
-            plt.ylabel('N. species',  fontsize=14)
-            plt.close()
-            plot_divtraj = matplotlib.backends.backend_pdf.PdfPages(file_name)        
-            plot_divtraj.savefig( fig )
-            plot_divtraj.close()
-        
-        
-        
-        if np.min(res['range_through_traj'] - res['fossil_count']) < 0:
-            sys.exit("\nIncompatible bbb_condition!\n")
-        
-        """
-        run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n = 0, DAbatch=DAbatch)
-        """
-        true_root = np.max(res['ts'])
-        true_ext = np.min(res['te'])
-        true_q = res['avg_q']
-        true_sig2 = 0
-        indx_clade_life_span = np.array([i for i in range(len(mid_points)) if mid_points[i] < true_root])
-        
-        f = res['fossil_count']
-        max_obs_ind = np.max(np.where(f > 0)[0])
-        age_oldest_obs_occ = res['oldest_occ']
-        print("true_root",true_root, "obs_root",age_oldest_obs_occ)
-        print("true_ext",true_ext, "obs_ext",res['youngest_occ'])
-        print("n. fossils", np.sum(res['fossil_count']))
-        print("n. sampled taxa", res['fadlad_tbl'].shape[0], "\nn. true taxa", len(res['ts']))
-        print("n. singleton taxa", 
-              np.sum(res['fadlad_tbl'][:,0] == res['fadlad_tbl'][:,1]) - np.sum(res['fadlad_tbl'][:,1] == 0))
-        
-        # z = np.zeros(max_obs_ind)
-        # x = z + 0
-        # x[:len(z)] = 0
-        x = res['fossil_count'][:max_obs_ind]
-        # bbb_condition = z + 0
-        # bbb_condition[:len(res['fossil_count'])] = res['range_through_traj']
-        bbb_condition = res['range_through_traj'][:max_obs_ind]
+            if save_summary:
+                # [lik_A, est_root_A, est_ext_A, est_q_A, est_sig2_A]
+                post_burnin_res = bbb_res[ int(bbb_res.shape[0]*0.2):, : ]
+                par_est = np.mean(post_burnin_res, axis=0)
+                root_est_hpd = calcHPD(post_burnin_res[:,1]) # clade age
+                ext_est_hpd = calcHPD(post_burnin_res[:,2]) # extinction age
 
-        if DEBUG:
-            print(len(x))
-            print(len(bbb_condition))
-            print('Nobs', res['n_extant'])
-        
-        bbb_res=run_mcmc(age_oldest_obs_occ=res['oldest_occ'], 
-                         age_youngest_obs_occ=res['youngest_occ'], 
-                         x=x, # fossil data (fad/lad)
-                         log_Nobs=np.log(np.max([1, res['n_extant']])), 
-                         Nobs=res['n_extant'], 
-                         sim_n=sim_number,
-                         bbb_condition=bbb_condition)
-        sim_number +=1
+                if save_summary:
+                    text_str = "\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % \
+                    ( 
+                        sim_number, Nobs, n_fossils, n_sampled_taxa, n_singleton_taxa, n_true_taxa,
+                        true_root, age_oldest_obs_occ, true_ext, age_youngest_obs_occ,
+                        true_q, true_sig2, 
+                        par_est[1], root_est_hpd[0], root_est_hpd[1], 
+                        par_est[2], ext_est_hpd[0], ext_est_hpd[1], 
+                        par_est[3], par_est[4]
+                    )
+                    logfile.writelines(text_str)
+                    logfile.flush()
+            #---------------------------#
+            
+            sim_number +=1
+            
+            
+            
+            
 
-else:
-    ### EMPIRICAL ANALYSES
-    data_file = args.fossil_data
-    fossil_data = np.loadtxt(data_file,skiprows=1)
-    taxa_names = np.array(next(open(data_file)).split())
-    print(max_age, fossil_data[0,0])
-    mid_points = np.linspace(fossil_data[0,0],max_age,int(max_age/fossil_data[0,0]))
-    bin_size = np.abs(np.diff(mid_points)[0])
+    else:
+        ### EMPIRICAL ANALYSES
+        data_file = args.fossil_data
+        fossil_data = np.loadtxt(data_file,skiprows=1)
+        taxa_names = np.array(next(open(data_file)).split())
+        print(max_age, fossil_data[0,0])
+        mid_points = np.linspace(fossil_data[0,0],max_age,int(max_age/fossil_data[0,0]))
+        bin_size = np.abs(np.diff(mid_points)[0])
     
-    counts_file = args.div_table
-    diversity_table = np.genfromtxt(counts_file,dtype='str',skip_header=1)
+        counts_file = args.div_table
+        diversity_table = np.genfromtxt(counts_file,dtype='str',skip_header=1)
     
-    taxa_list = np.intersect1d(taxa_names, diversity_table[:,0])
+        taxa_list = np.intersect1d(taxa_names, diversity_table[:,0])
     
-    if np.max(args.clades) > 0:
-        taxa_list = taxa_list[args.clades[0]:(args.clades[1]+1)]
+        if np.max(args.clades) > 0:
+            taxa_list = taxa_list[args.clades[0]:(args.clades[1]+1)]
     
-    if args.clade_name != "":
-        taxa_list = np.array([i for i in taxa_list if args.clade_name in i])
+        if args.clade_name != "":
+            taxa_list = np.array([i for i in taxa_list if args.clade_name in i])
     
-    print("Found", len(taxa_list), "clades:")
-    print(taxa_list[0:5], "...")
+        print("Found", len(taxa_list), "clades:")
+        print(taxa_list[0:5], "...")
     
-    for taxon in taxa_list:
-        print("\nParsing data...", taxon)
+        for taxon in taxa_list:
+            print("\nParsing data...", taxon)
     
-        Nobs = int(diversity_table[diversity_table[:,0]==taxon,1])
+            Nobs = int(diversity_table[diversity_table[:,0]==taxon,1])
 
-        taxon_indx = np.where(taxa_names==taxon)[0][0]
-        x= fossil_data[:,taxon_indx]
+            taxon_indx = np.where(taxa_names==taxon)[0][0]
+            x= fossil_data[:,taxon_indx]
     
-        x = get_fossil_count(x)
-        print("mid_points", mid_points)
-        age_oldest_obs_occ = mid_points[len(x)-1]
-        age_youngest_obs_occ = np.min(mid_points[np.where(x > 0)[0]])
-        Nfoss  = int(np.sum(x))
-        if Nobs:
-            log_Nobs = np.log(Nobs)
-        else:
-            log_Nobs = 0
+            x = get_fossil_count(x)
+            print("mid_points", mid_points)
+            age_oldest_obs_occ = mid_points[len(x)-1]
+            age_youngest_obs_occ = np.min(mid_points[np.where(x > 0)[0]])
+            Nfoss  = int(np.sum(x))
+            if Nobs:
+                log_Nobs = np.log(Nobs)
+            else:
+                log_Nobs = 0
     
-        x_0 = 1
-        n_samples = len(mid_points)-len(x)
-        x_augmented = 0+x
+            x_0 = 1
+            n_samples = len(mid_points)-len(x)
+            x_augmented = 0+x
         
-        print(Nobs, x_augmented)
-        if Nobs < x_augmented[0]:
-            e = "Modern diversity is lower than sampled diversity at most recent time bin. Consider using smaller timebins."
-            sys.exit(e)
+            print(Nobs, x_augmented)
+            if Nobs < x_augmented[0]:
+                e = "Modern diversity is lower than sampled diversity at most recent time bin. Consider using smaller timebins."
+                sys.exit(e)
         
-        if np.sum(x)< 1: 
-            print("No fossils:",np.sum(x),age_oldest_obs_occ, age_youngest_obs_occ)
-        else:
-            print("N. fossils:",np.sum(x), "N. extant species:", Nobs,
-                  "\nAge oldest occurrence:",age_oldest_obs_occ, 
-                  "Age youngest occurrence:",age_youngest_obs_occ)
-            res=run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, taxon)
+            if np.sum(x)< 1: 
+                print("No fossils:",np.sum(x),age_oldest_obs_occ, age_youngest_obs_occ)
+            else:
+                print("N. fossils:",np.sum(x), "N. extant species:", Nobs,
+                      "\nAge oldest occurrence:",age_oldest_obs_occ, 
+                      "Age youngest occurrence:",age_youngest_obs_occ)
+                res=run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, taxon)
             
         
-"python3 rootBBB.py -sim 1 -seed 5962 -p 10"
+    "python3 rootBBB.py -sim 1 -seed 5962 -p 10"
