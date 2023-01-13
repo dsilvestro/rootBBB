@@ -44,8 +44,12 @@ def write_pyrate_input(sim_record, sim_record_LR, sp_names, filename="test"):
         all_d=data+d+names+taxa_names+f
         write_to_file(os.path.join(output_wd, "%s_lr.py" % filename), all_d)     
 
-def fossilize(ts, te, min_q, max_q, rate_shifts, freq_zero_preservation):
-    rates = np.random.uniform(min_q, max_q, len(rate_shifts))
+def fossilize(ts, te, min_q, max_q, rate_shifts, freq_zero_preservation, q_log_mean_sd=None, alpha=0.005):
+    if q_log_mean_sd is not None:
+        rates = np.exp(np.random.normal(q_log_mean_sd[0], q_log_mean_sd[1], len(rate_shifts)))
+    else:
+        rates = np.random.uniform(min_q, max_q, len(rate_shifts))
+    
     if freq_zero_preservation:
         rates = rates * np.random.binomial(1, 1-freq_zero_preservation, len(rates))
     
@@ -53,22 +57,26 @@ def fossilize(ts, te, min_q, max_q, rate_shifts, freq_zero_preservation):
     sim_record = []
     sim_record_LR = []
     sp_names = []
+    
+    # gamma model
+    sp_gamma_mul = np.random.gamma(alpha, 1/alpha, len(ts))
+    
     for sp_i in range(len(ts)):
         fad = ts[sp_i]
         lad = te[sp_i]
         
         rate_shifts_included = rate_shifts[rate_shifts > lad]
         rate_shifts_included = rate_shifts_included[rate_shifts_included < fad]
-
+        
         comb = np.sort(np.concatenate((np.array([fad,lad]), rate_shifts_included)))
-
+        
         indx = np.digitize(comb, rate_shifts)
         rates_i = rates[indx]
-
+        
         sp_record = []
         for i in range(len(comb)-1):
             dt = comb[i+1] - comb[i]
-            n_foss = np.random.poisson(rates_i[i] * dt)
+            n_foss = np.random.poisson(rates_i[i] * dt * sp_gamma_mul[sp_i])
             if n_foss:
                 foss = np.sort(np.random.uniform(comb[i], comb[i+1], n_foss))
                 sp_record = sp_record + list(foss)
@@ -121,10 +129,11 @@ def getDT_equalbin(T,s,e):
     return np.array(counts).astype(int)
     
 def get_fad_lad(fossils):
-    fadlad_tbl = np.zeros((len(fossils), 2))
+    fadlad_tbl = np.zeros((len(fossils), 3))
     for i in range(len(fossils)):
         fadlad_tbl[i, 0] = np.max(fossils[i])
         fadlad_tbl[i, 1] = np.min(fossils[i])        
+        fadlad_tbl[i, 2] = len(fossils[i])        
     return fadlad_tbl
 
 def get_fossil_count(T, s, e):
@@ -147,6 +156,7 @@ def generate_bbb_data(ts, te,
                       time_bins=None,
                       max_root=0,
                       q_range=[0.005, 0.05],
+                      q_log_mean_sd=None,
                       rate_shifts=None,
                       avg_n_q_rate_shifts=0,
                       freq_zero_preservation=0,
@@ -162,7 +172,7 @@ def generate_bbb_data(ts, te,
             rate_shifts = np.linspace(0, max_root, 2 + np.random.poisson(avg_n_q_rate_shifts))[::-1] # +2 to ensure the boundaries are included
         
         [min_q, max_q] = q_range
-        sim_record, sim_record_LR, sp_names, q_rates = fossilize(ts, te, min_q, max_q, rate_shifts, freq_zero_preservation)
+        sim_record, sim_record_LR, sp_names, q_rates = fossilize(ts, te, min_q, max_q, rate_shifts, freq_zero_preservation, q_log_mean_sd)
         tbl = get_fad_lad(sim_record)
         # get range-through trajectory
     
@@ -181,6 +191,7 @@ def generate_bbb_data(ts, te,
             print("time_bins", time_bins)
             print(range_through_traj) # min boundary for BB
             print('q_rates', q_rates)
+            print('rate_shifts (q)', rate_shifts)
         try:
             res = {
                 'ts': ts,

@@ -667,10 +667,11 @@ if __name__ == '__main__':
         #-- simulation parameters --#
         root_age_range = np.array([100, 30.])
         n_sp_range = np.array([1000, 10000])
-        avg_n_q_rate_shifts=10 # if =0 -> constant preservation
+        avg_n_q_rate_shifts=100 # if =0 -> constant preservation
         rangeL = [0.1, 0.4]
         rangeM = [0.1, 0.4]
         q_range = np.array([0.0001, 0.01]) + q_offset
+        q_log_mean_sd = np.array([np.log(0.002), 0.5])
         print_ltt = False
         #---------------------------#
     
@@ -692,6 +693,7 @@ if __name__ == '__main__':
                                     bin_size=bin_size,
                                     time_bins=mid_points,
                                     q_range=q_range,
+                                    q_log_mean_sd=q_log_mean_sd,
                                     rate_shifts=None,
                                     avg_n_q_rate_shifts=avg_n_q_rate_shifts, 
                                     freq_zero_preservation=freq_zero_preservation,
