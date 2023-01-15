@@ -186,7 +186,7 @@ def run_sim(sim=0,
                 else:
                     root = -root_age
                 timesL,timesM,L,M = get_random_settings(root,poiL,poiM, rangeL, rangeM)
-                L[0] = M[0] * 2
+                L[0] = np.random.uniform(np.max(rangeM), 5 * np.max(rangeM))
             else:
                 timesL = np.sort(np.array([float(root_age),0.]+shift_speciation))[::-1]
                 timesM = np.sort(np.array([float(root_age),0.]+shift_extinction))[::-1]

@@ -675,7 +675,7 @@ if __name__ == '__main__':
         rangeL = [0.1, 0.4]
         rangeM = [0.1, 0.4]
         q_range = np.array([0.0001, 0.01]) + q_offset
-        q_log_mean_sd = np.array([np.log(0.002), 0.5])
+        q_log_mean_sd = np.array([np.log(0.01), 0.5])
         print_ltt = False
         #---------------------------#
     
@@ -770,7 +770,7 @@ if __name__ == '__main__':
             max_obs_ind = np.max(np.where(f > 0)[0])
             age_oldest_obs_occ = res['oldest_occ']
             age_youngest_obs_occ = res['youngest_occ']
-            n_singleton_taxa = np.sum(res['fadlad_tbl'][:,0] == res['fadlad_tbl'][:,1]) - np.sum(res['fadlad_tbl'][:,1] == 0)
+            n_singleton_taxa = np.sum(res['fadlad_tbl'][:,0] == res['fadlad_tbl'][:,1])
             n_sampled_taxa = res['fadlad_tbl'].shape[0]
             n_true_taxa = len(res['ts'])
             n_fossils = np.sum(res['fossil_count'])
