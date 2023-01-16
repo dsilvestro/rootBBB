@@ -669,7 +669,9 @@ if __name__ == '__main__':
         mid_points = np.linspace(0,2*max_age,int(2*max_age/BIN_SIZE)+1)
         bin_size = np.abs(np.diff(mid_points)[0])
         
-        root_age_range = np.array([max_age, 30.])
+        max_true_root_age = 100
+        min_true_root_age = 30
+        root_age_range = np.array([max_true_root_age, min_true_root_age])
         n_sp_range = np.array([1000, 10000])
         avg_n_q_rate_shifts=100 # if =0 -> constant preservation
         rangeL = [0.1, 0.4]
