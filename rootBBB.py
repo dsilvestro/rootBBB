@@ -24,7 +24,7 @@ p.add_argument('-biased_q', type=int,   help='if 1 set increasing q through time
 p.add_argument('-freq_q0',  type=float, help='frequency of 0-sampling rate', default = 0.1)
 p.add_argument('-q_var',    type=int,   help='0) constant q 1) linearly increasing q', default = 0)
 p.add_argument('-q_exp',    type=int,   help='magnitude of variation', default = 1)
-p.add_argument('-clades',   type=int,   help='range of clade to be analyzed', default = [0,0], nargs=2)
+p.add_argument('-clades',   type=int,   help='range of clade to be analyzed', default = [0,-1], nargs=2)
 p.add_argument('-outpath',  type=str,   help='path output', default = ".")
 p.add_argument('-clade_name', type=str,   help='', default = "")
 p.add_argument('-f',        type=float, help='freq. DA runs with updates', default = 0.95)
@@ -654,13 +654,16 @@ else:
     
     taxa_list = np.intersect1d(taxa_names, diversity_table[:,0])
     
-    if np.max(args.clades) > 0:
+    if np.min(args.clades) >= 0:
         taxa_list = taxa_list[args.clades[0]:(args.clades[1]+1)]
     
     if args.clade_name != "":
         taxa_list = np.array([i for i in taxa_list if args.clade_name in i])
     
-    print("Found", len(taxa_list), "clades:")
+    if len(taxa_list)==1: 
+        print("Found 1 clade:")
+    else: 
+        print("Found", len(taxa_list), "clades:")
     print(taxa_list[0:5], "...")
     
     for taxon in taxa_list:
