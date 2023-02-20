@@ -672,13 +672,15 @@ if __name__ == '__main__':
         max_true_root_age = 100
         min_true_root_age = 30
         root_age_range = np.array([max_true_root_age, min_true_root_age])
-        n_sp_range = np.array([1000, 10000])
+        n_sp_range = np.array([2000, 20000])
         avg_n_q_rate_shifts=100 # if =0 -> constant preservation
-        rangeL = [0.1, 0.4]
-        rangeM = [0.1, 0.4]
+        rangeL = [0.1, 1]
+        rangeM = [0.1, 1]
         q_range = np.array([0.0001, 0.01]) + q_offset
         q_log_mean_sd = np.array([np.log(0.01), 0.5])
-        print_ltt = False
+        print_ltt = True
+        # if DEBUG:
+        #     print_ltt = True
         #---------------------------#
     
         sim_number = 1
@@ -692,7 +694,9 @@ if __name__ == '__main__':
                              rangeSP=n_sp_range,
                              rangeL=rangeL,
                              rangeM=rangeM,
-                             print_ltt=print_ltt
+                             print_ltt=print_ltt,
+                             poiL = 10,
+                             poiM = 10,
                             )
                     
             res = generate_bbb_data(ts, te,
@@ -903,3 +907,4 @@ if __name__ == '__main__':
             
         
     "python3 rootBBB.py -sim 1 -seed 5962 -p 10"
+    "python3 rangeBBB.py -sim_range 1 -sim 100 -q_min 0 -q_var 1 -seed 1234"

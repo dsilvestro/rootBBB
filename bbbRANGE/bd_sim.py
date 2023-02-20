@@ -27,25 +27,32 @@ def get_DT(T,s,e): # returns the Diversity Trajectory of s,e at times T (x10 fas
     #return np.insert(np.cumsum(DD),0,0)[0:len(T)]
     return np.cumsum(DD)[0:len(T)] 
 
-def simulate(L,M,timesL, timesM,root,scale,s_species, maxSP,gl=0,gm=0,Dtraj=[0],Tcomp_clade=[0]):
+def simulate(L,M,timesL, timesM,root,scale,s_species, maxSP,
+             gl=0,gm=0,Dtraj=[0],Tcomp_clade=[0],
+             minimum_standing_age=0):
     ts=list()
     te=list()
-    l_t=L[0]
-    m_t=M[0]
+    l_t = L[0]
+    m_t = M[0]
     
     L,M,root=L/scale,M/scale,int(root*scale)
+    l = l_t/scale
+    m = m_t/scale
 
-    for i  in range(s_species): 
+    for i in range(s_species): 
         ts.append(root)
         te.append(0)
     
     
     for t in range(root,0): # time
         if gl==0 and gm==0:
-            for j in range(len(timesL)-1):
-                if -t/scale<=timesL[j] and -t/scale>timesL[j+1]: l=L[j]
-            for j in range(len(timesM)-1):
-                if -t/scale<=timesM[j] and -t/scale>timesM[j+1]: m=M[j]
+            if len(ts) > minimum_standing_age:
+                for j in range(len(timesL)-1):
+                    if -t/scale<=timesL[j] and -t/scale>timesL[j+1]: l=L[j]
+                for j in range(len(timesM)-1):
+                    if -t/scale<=timesM[j] and -t/scale>timesM[j+1]: m=M[j]
+            else:
+                l = l * 0.999 # initial time dependent speciation until 50 species are reached
 
         elif max(Dtraj)>0:
             try: D=Dtraj[Tcomp_clade== -int(t/scale)][0]
@@ -78,6 +85,7 @@ def simulate(L,M,timesL, timesM,root,scale,s_species, maxSP,gl=0,gm=0,Dtraj=[0],
                 elif ran>l and ran < (l+m): # extinction
                     te[j]=t
     te=np.array(te)
+    # print(TE, l, m, l_t/scale, m_t/scale)
     return -np.array(ts)/scale, -(te)/scale
 
 ############### SIMULATION SETTINGS ########################################
@@ -157,8 +165,8 @@ def run_sim(sim=0,
             poiL = 4,         # expected number of shifts (if 0: constant rate BD; if -1 use empirical Prob vec)
             poiM = 4,          # expected number of shifts (if 0: constant rate BD; if -1 use empirical Prob vec)
             root_r=np.array([60,30.]), # range root ages
-            rangeL = [0.1 , 0.4],
-            rangeM = [0.1 , 0.4],
+            rangeL = [0.2 , 0.4],
+            rangeM = [0.1 , 0.5],
             # To assign specific probabilities to the random birth-death configurations
             # you can define the probabilities through probability vectors
             # (these are not used unless 'poiL = -1' and/or 'poiL = -1'): 
@@ -186,7 +194,8 @@ def run_sim(sim=0,
                 else:
                     root = -root_age
                 timesL,timesM,L,M = get_random_settings(root,poiL,poiM, rangeL, rangeM)
-                L[0] = np.random.uniform(np.max(rangeM), 5 * np.max(rangeM))
+                # L[0] = np.random.uniform(np.max(rangeM), 5 * np.max(rangeM))
+                M[0] = 0 
             else:
                 timesL = np.sort(np.array([float(root_age),0.]+shift_speciation))[::-1]
                 timesM = np.sort(np.array([float(root_age),0.]+shift_extinction))[::-1]
@@ -211,10 +220,13 @@ def run_sim(sim=0,
     
     if print_ltt:
         ltt=""
+        all_n = []
+        for i in range(int(np.max(FAtrue))):
+            all_n.append(len(FAtrue[FAtrue>i])-len(LOtrue[LOtrue>i]))
         for i in range(int(np.max(FAtrue))):
             n=len(FAtrue[FAtrue>i])-len(LOtrue[LOtrue>i])
             #nlog=int((n))
-            ltt += "\n%s\t%s\t%s" % (i, n, "*"*n)
+            ltt += "\n%s\t%s\t%s" % (i, n, "*" * int(round(n / np.max(all_n) * 180)))
         print(ltt)
 
     i += 1
