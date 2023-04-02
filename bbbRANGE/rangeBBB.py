@@ -7,9 +7,10 @@ import scipy.stats
 from matplotlib import pyplot
 import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf
+import pandas as pd
 
 p = argparse.ArgumentParser()
-p.add_argument('-fadlad_data',type=str,   help='table with fossil counts per bin', default = "")
+p.add_argument('-fadlad_data',type=str,   help='table with fossil counts per bin', default = None)
 p.add_argument('-fossil_data',type=str,   help='table with fossil counts per bin', default = "")
 p.add_argument('-div_table' ,type=str,   help='table with present diversity per lineage', default = "")
 p.add_argument('-n',        type=int,   help='n. MCMC iterations', default = 25000)
@@ -717,6 +718,7 @@ if __name__ == '__main__':
             #         'fossil_count': fossil_count,
             #         'n_extant': len(te[te == 0]),
             #         'oldest_occ': np.max(tbl),
+            #         'fadlad_tbl': tbl,
             #         'youngest_occ': np.max(tbl),
             #         'true_range_through_traj': true_range_through_traj,
             #         'avg_q': np.mean(q_rates),
@@ -757,6 +759,14 @@ if __name__ == '__main__':
                 plot_divtraj = matplotlib.backends.backend_pdf.PdfPages(file_name)        
                 plot_divtraj.savefig( fig )
                 plot_divtraj.close()
+                
+                
+                tbl = pd.DataFrame(res['fadlad_tbl'])
+                tax_id = pd.DataFrame([["taxon_%s" % i, res['n_extant']] for i in range(tbl.shape[0])])
+                tbl2 = pd.concat((tax_id, tbl), axis=1)
+                tbl2.columns = ["taxon", "n_extant", "fad", "lad", "n_occs"]
+                tbl2.to_csv(file_name.replace(".pdf", ".txt"), index=False, sep="\t")
+                
         
         
         
@@ -802,6 +812,10 @@ if __name__ == '__main__':
                 print("x", x)
                 print("bbb_condition", bbb_condition)
                 print("Nobs", res['n_extant'])
+                print("age_oldest_obs_occ", age_oldest_obs_occ)
+                print("age_oldest_obs_occ", age_oldest_obs_occ)
+                quit()
+                
                 
         
             bbb_res=run_mcmc(age_oldest_obs_occ=age_oldest_obs_occ, 
@@ -852,76 +866,96 @@ if __name__ == '__main__':
             
 
     else:
-        ### EMPIRICAL ANALYSES
-        data_file = args.fossil_data
-        fossil_data = np.loadtxt(data_file,skiprows=1)
-        taxa_names = np.array(next(open(data_file)).split())
-        print(max_age, fossil_data[0,0])
-        mid_points = np.linspace(fossil_data[0,0],max_age,int(max_age/fossil_data[0,0]))
-        bin_size = np.abs(np.diff(mid_points)[0])
+        ### EMPIRICAL ANALYSES (standard BBB model)
+        if args.fadlad_data is None:
+            data_file = args.fossil_data
+            fossil_data = np.loadtxt(data_file,skiprows=1)
+            taxa_names = np.array(next(open(data_file)).split())
+            print(max_age, fossil_data[0,0])
+            mid_points = np.linspace(fossil_data[0,0],max_age,int(max_age/fossil_data[0,0]))
+            bin_size = np.abs(np.diff(mid_points)[0])
     
-        counts_file = args.div_table
-        diversity_table = np.genfromtxt(counts_file,dtype='str',skip_header=1)
+            counts_file = args.div_table
+            diversity_table = np.genfromtxt(counts_file,dtype='str',skip_header=1)
     
-        taxa_list = np.intersect1d(taxa_names, diversity_table[:,0])
+            taxa_list = np.intersect1d(taxa_names, diversity_table[:,0])
     
-        if np.max(args.clades) > 0:
-            taxa_list = taxa_list[args.clades[0]:(args.clades[1]+1)]
+            if np.max(args.clades) > 0:
+                taxa_list = taxa_list[args.clades[0]:(args.clades[1]+1)]
     
-        if args.clade_name != "":
-            taxa_list = np.array([i for i in taxa_list if args.clade_name in i])
+            if args.clade_name != "":
+                taxa_list = np.array([i for i in taxa_list if args.clade_name in i])
     
-        print("Found", len(taxa_list), "clades:")
-        print(taxa_list[0:5], "...")
+            print("Found", len(taxa_list), "clades:")
+            print(taxa_list[0:5], "...")
     
-        for taxon in taxa_list:
-            print("\nParsing data...", taxon)
+            for taxon in taxa_list:
+                print("\nParsing data...", taxon)
     
-            Nobs = int(diversity_table[diversity_table[:,0]==taxon,1])
+                Nobs = int(diversity_table[diversity_table[:,0]==taxon,1])
 
-            taxon_indx = np.where(taxa_names==taxon)[0][0]
-            x= fossil_data[:,taxon_indx]
+                taxon_indx = np.where(taxa_names==taxon)[0][0]
+                x= fossil_data[:,taxon_indx]
     
-            x = get_fossil_count(x)
-            print("mid_points", mid_points)
-            age_oldest_obs_occ = mid_points[len(x)-1]
-            age_youngest_obs_occ = np.min(mid_points[np.where(x > 0)[0]])
-            Nfoss  = int(np.sum(x))
-            if Nobs:
-                log_Nobs = np.log(Nobs)
-            else:
-                log_Nobs = 0
+                x = get_fossil_count(x)
+                print("mid_points", mid_points)
+                age_oldest_obs_occ = mid_points[len(x)-1]
+                age_youngest_obs_occ = np.min(mid_points[np.where(x > 0)[0]])
+                Nfoss  = int(np.sum(x))
+                if Nobs:
+                    log_Nobs = np.log(Nobs)
+                else:
+                    log_Nobs = 0
     
-            x_0 = 1
-            n_samples = len(mid_points)-len(x)
-            x_augmented = 0+x
+                x_0 = 1
+                n_samples = len(mid_points)-len(x)
+                x_augmented = 0+x
         
-            print(Nobs, x_augmented)
-            if Nobs < x_augmented[0]:
-                e = "Modern diversity is lower than sampled diversity at most recent time bin. Consider using smaller timebins."
-                sys.exit(e)
+                print(Nobs, x_augmented)
+                if Nobs < x_augmented[0]:
+                    e = "Modern diversity is lower than sampled diversity at most recent time bin. Consider using smaller timebins."
+                    sys.exit(e)
         
-            if np.sum(x)< 1: 
-                print("No fossils:",np.sum(x),age_oldest_obs_occ, age_youngest_obs_occ)
-            else:
-                print("N. fossils:",np.sum(x), "N. extant species:", Nobs,
-                      "\nAge oldest occurrence:",age_oldest_obs_occ, 
-                      "Age youngest occurrence:",age_youngest_obs_occ)
-                res=run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, taxon)
+                if np.sum(x)< 1: 
+                    print("No fossils:",np.sum(x),age_oldest_obs_occ, age_youngest_obs_occ)
+                else:
+                    print("N. fossils:",np.sum(x), "N. extant species:", Nobs,
+                          "\nAge oldest occurrence:",age_oldest_obs_occ, 
+                          "Age youngest occurrence:",age_youngest_obs_occ)
+                    res=run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, taxon)
+            
+        #------
+        # run range model
+        else:
+            print("Running BBB-range model", args.fadlad_data)
+            from bd_sim import *
+            from fossil_sim import *
+            print("seed",seed)
+            init_seed = seed + 0
+            tbl = pd.read_csv(args.fadlad_data, sep="\t")
+
+            #-- simulation parameters --#
+            BIN_SIZE = 1
+            mid_points = np.linspace(0,2*max_age,int(2*max_age/BIN_SIZE)+1)
+            bin_size = np.abs(np.diff(mid_points)[0])
+            
+            range_through_traj = getDT_equalbin(mid_points, tbl["fad"].to_numpy(), tbl["lad"].to_numpy())
+            fossil_count = get_fossil_count(mid_points, tbl["fad"].to_numpy(), tbl["lad"].to_numpy())
+            
             
     
-    #------
-    # run range model
-    bbb_res=run_mcmc(age_oldest_obs_occ=age_oldest_obs_occ, 
-                     age_youngest_obs_occ=age_youngest_obs_occ, 
-                     x=x, # fossil data (fad/lad)
-                     log_Nobs=np.log(np.max([1, res['n_extant']])), 
-                     Nobs=res['n_extant'], 
-                     sim_n=sim_number,
-                     bbb_condition=bbb_condition)
+            bbb_res=run_mcmc(age_oldest_obs_occ=np.max(tbl["fad"]), 
+                             age_youngest_obs_occ=age_youngest_obs_occ, 
+                             x=fossil_count, # fossil data (fad/lad)
+                             log_Nobs=np.log(np.max([1, res['n_extant']])), 
+                             Nobs=res['n_extant'], 
+                             sim_n=sim_number,
+                             bbb_condition=bbb_condition)
     
     
     
-        
-    "python3 rootBBB.py -sim 1 -seed 5962 -p 10"
-    "python3 rangeBBB.py -sim_range 1 -sim 100 -q_min 0 -q_var 1 -seed 1234"
+
+
+# examples
+"python3 rootBBB.py -sim 1 -seed 5962 -p 10"
+"python3 rangeBBB.py -sim_range 1 -sim 100 -q_min 0 -q_var 1 -seed 1234"
