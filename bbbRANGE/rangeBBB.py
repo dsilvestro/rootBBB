@@ -10,6 +10,7 @@ import matplotlib.backends.backend_pdf
 
 p = argparse.ArgumentParser()
 p.add_argument('-fadlad_data',type=str,   help='table with fossil counts per bin', default = "")
+p.add_argument('-fossil_data',type=str,   help='table with fossil counts per bin', default = "")
 p.add_argument('-div_table' ,type=str,   help='table with present diversity per lineage', default = "")
 p.add_argument('-n',        type=int,   help='n. MCMC iterations', default = 25000)
 p.add_argument('-s',        type=int,   help='sampling freq', default = 100)
@@ -19,7 +20,7 @@ p.add_argument('-seed',     type=int,   help='random seed', default = -1)
 p.add_argument('-verbose',  type=int,   help='verbose', default = 1)
 p.add_argument('-sim',      type=int,   help='if >1 run simulations', default = 0)
 p.add_argument('-sim_extinct', type=int,  help='0: simulate extant clades; 1: simulate extinct clades', default = 0)
-p.add_argument('-sim_range', type=int,  help='0: simulate extant clades; 1: simulate extinct clades', default = 0)
+p.add_argument('-sim_range', type=int,  help='1: simulate range data', default = 0)
 p.add_argument('-biased_q', type=int,   help='if 1 set increasing q through time', default = 0)
 p.add_argument('-freq_q0',  type=float, help='frequency of 0-sampling rate', default = 0.1)
 p.add_argument('-q_var',    type=int,   help='0) constant q 1) linearly increasing q', default = 0)
@@ -634,8 +635,7 @@ if __name__ == '__main__':
                 print("replicate:", sim_number)
                 print("N. fossils:",np.sum(x),"Obs age:", age_oldest_obs_occ)
                 print("x vector:", x)
-                print(len(x))
-            
+                print(len(x))            
             
                 res=run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_number)
 
@@ -799,6 +799,10 @@ if __name__ == '__main__':
                 print(len(x))
                 print(len(bbb_condition))
                 print('Nobs', res['n_extant'])
+                print("x", x)
+                print("bbb_condition", bbb_condition)
+                print("Nobs", res['n_extant'])
+                
         
             bbb_res=run_mcmc(age_oldest_obs_occ=age_oldest_obs_occ, 
                              age_youngest_obs_occ=age_youngest_obs_occ, 
@@ -905,6 +909,19 @@ if __name__ == '__main__':
                       "Age youngest occurrence:",age_youngest_obs_occ)
                 res=run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, taxon)
             
+    
+    #------
+    # run range model
+    bbb_res=run_mcmc(age_oldest_obs_occ=age_oldest_obs_occ, 
+                     age_youngest_obs_occ=age_youngest_obs_occ, 
+                     x=x, # fossil data (fad/lad)
+                     log_Nobs=np.log(np.max([1, res['n_extant']])), 
+                     Nobs=res['n_extant'], 
+                     sim_n=sim_number,
+                     bbb_condition=bbb_condition)
+    
+    
+    
         
     "python3 rootBBB.py -sim 1 -seed 5962 -p 10"
     "python3 rangeBBB.py -sim_range 1 -sim 100 -q_min 0 -q_var 1 -seed 1234"
