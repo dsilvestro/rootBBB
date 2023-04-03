@@ -814,9 +814,6 @@ if __name__ == '__main__':
                 print("Nobs", res['n_extant'])
                 print("age_oldest_obs_occ", age_oldest_obs_occ)
                 print("age_oldest_obs_occ", age_oldest_obs_occ)
-                quit()
-                
-                
         
             bbb_res=run_mcmc(age_oldest_obs_occ=age_oldest_obs_occ, 
                              age_youngest_obs_occ=age_youngest_obs_occ, 
@@ -941,15 +938,27 @@ if __name__ == '__main__':
             
             range_through_traj = getDT_equalbin(mid_points, tbl["fad"].to_numpy(), tbl["lad"].to_numpy())
             fossil_count = get_fossil_count(mid_points, tbl["fad"].to_numpy(), tbl["lad"].to_numpy())
+            if tbl["n_extant"][0] > 0:
+                age_youngest_obs_occ = 0
+            else:
+                age_youngest_obs_occ = np.min(tbl["lad"])
+           
+            print("age oldest occ:", np.max(tbl["fad"]))
+            print("age youngest occ:", age_youngest_obs_occ)
+            print("present diversity:", tbl['n_extant'][0])
+            if DEBUG:
+                print("fossils:\n", fossil_count)
+                print("range_through_traj:\n", range_through_traj)
             
-            
+            max_obs_ind = np.max(np.where(fossil_count > 0)[0])
+            x = fossil_count[:max_obs_ind]
+            bbb_condition = range_through_traj[:max_obs_ind]
     
             bbb_res=run_mcmc(age_oldest_obs_occ=np.max(tbl["fad"]), 
                              age_youngest_obs_occ=age_youngest_obs_occ, 
-                             x=fossil_count, # fossil data (fad/lad)
-                             log_Nobs=np.log(np.max([1, res['n_extant']])), 
-                             Nobs=res['n_extant'], 
-                             sim_n=sim_number,
+                             x=x, # fossil data (fad/lad)
+                             log_Nobs=np.log(np.max([1, tbl['n_extant'][0]])), 
+                             Nobs=tbl['n_extant'][0], 
                              bbb_condition=bbb_condition)
     
     
