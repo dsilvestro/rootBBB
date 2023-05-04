@@ -163,7 +163,7 @@ def calcHPD(data, level=0.95) :
     assert 0 <= i <= i+nIn-1 < len(d)    
     return np.array([d[i], d[i+nIn-1]])
 
-def get_fossil_count(data):
+def get_fossil_count_occs(data):
     x = data[::-1] + 0  # order is temporarily reversed
     j,c=0,0
     for i in range(len(x)):
@@ -355,7 +355,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\text_obs\troot_true\text_true\tq_med_true\tsig2_true\tDA_counts\troot_est\text_est\tq_est\ta_est\tsig2_est"
             logfile.writelines(text_str)
         else:
-            out_name = "%s/%s_mcmc_%s_f%s%s%s.log" % (args.outpath, sim_n, seed, freq_par_updates, args.out, model_out)
+            out_name = "%s/%s_mcmc_%s_f%s%s%s.log" % (args.outpath, args.out, sim_n, seed, freq_par_updates, model_out)
             print("Writing output to:", out_name)
             logfile = open(out_name, "w") 
             text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\text_obs\tDA_counts\troot_est\text_est\tq_est\t\ta_est\tsig2_est"
@@ -894,7 +894,7 @@ if __name__ == '__main__':
                 taxon_indx = np.where(taxa_names==taxon)[0][0]
                 x= fossil_data[:,taxon_indx]
     
-                x = get_fossil_count(x)
+                x = get_fossil_count_occs(x)
                 print("mid_points", mid_points)
                 age_oldest_obs_occ = mid_points[len(x)-1]
                 age_youngest_obs_occ = np.min(mid_points[np.where(x > 0)[0]])
