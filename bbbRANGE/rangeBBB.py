@@ -355,7 +355,11 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\text_obs\troot_true\text_true\tq_med_true\tsig2_true\tDA_counts\troot_est\text_est\tq_est\ta_est\tsig2_est"
             logfile.writelines(text_str)
         else:
-            out_name = "%s/%s_mcmc_%s_f%s%s%s.log" % (args.outpath, args.out, sim_n, seed, freq_par_updates, model_out)
+            if args.out != "":
+                out_name = "%s/%s_%s_mcmc_%s_f%s%s.log" % (args.outpath, sim_n, args.out, seed, freq_par_updates, model_out)
+            else:
+                out_name = "%s/%s_mcmc_%s_f%s%s.log" % (args.outpath, sim_n, seed, freq_par_updates, model_out)
+                
             print("Writing output to:", out_name)
             logfile = open(out_name, "w") 
             text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\text_obs\tDA_counts\troot_est\text_est\tq_est\t\ta_est\tsig2_est"
@@ -783,7 +787,7 @@ if __name__ == '__main__':
             indx_clade_life_span = np.array([i for i in range(len(mid_points)) if mid_points[i] < true_root])
         
             f = res['fossil_count']
-            max_obs_ind = np.max(np.where(f > 0)[0])
+            max_obs_ind = np.max(np.where(f > 0)[0]) + 1
             age_oldest_obs_occ = res['oldest_occ']
             age_youngest_obs_occ = res['youngest_occ']
             n_singleton_taxa = np.sum(res['fadlad_tbl'][:,0] == res['fadlad_tbl'][:,1])
@@ -801,6 +805,7 @@ if __name__ == '__main__':
             # x = z + 0
             # x[:len(z)] = 0
             x = res['fossil_count'][:max_obs_ind]
+            # print("res['fossil_count'][:max_obs_ind]", x, res['fossil_count'])
             # bbb_condition = z + 0
             # bbb_condition[:len(res['fossil_count'])] = res['range_through_traj']
             bbb_condition = res['range_through_traj'][:max_obs_ind]
@@ -938,6 +943,9 @@ if __name__ == '__main__':
             
             range_through_traj = getDT_equalbin(mid_points, tbl["fad"].to_numpy(), tbl["lad"].to_numpy())
             fossil_count = get_fossil_count(mid_points, tbl["fad"].to_numpy(), tbl["lad"].to_numpy())
+            # print("np.sum(res['fossil_count'])", np.sum(fossil_count), fossil_count)
+            
+            
             if tbl["n_extant"][0] > 0:
                 age_youngest_obs_occ = 0
             else:
@@ -950,16 +958,23 @@ if __name__ == '__main__':
                 print("fossils:\n", fossil_count)
                 print("range_through_traj:\n", range_through_traj)
             
-            max_obs_ind = np.max(np.where(fossil_count > 0)[0])
+            max_obs_ind = np.max(np.where(fossil_count > 0)[0]) + 1
             x = fossil_count[:max_obs_ind]
+            # print("fossil_count[:max_obs_ind]", x, np.sum(x))
             bbb_condition = range_through_traj[:max_obs_ind]
+            
+            
+            input_file_raw = os.path.basename(args.fadlad_data)
+            clade_name = os.path.splitext(input_file_raw)[0]  # file name without extension
     
             bbb_res=run_mcmc(age_oldest_obs_occ=np.max(tbl["fad"]), 
                              age_youngest_obs_occ=age_youngest_obs_occ, 
                              x=x, # fossil data (fad/lad)
                              log_Nobs=np.log(np.max([1, tbl['n_extant'][0]])), 
                              Nobs=tbl['n_extant'][0], 
-                             bbb_condition=bbb_condition)
+                             bbb_condition=bbb_condition,
+                             sim_n=clade_name
+                             )
     
     
     
