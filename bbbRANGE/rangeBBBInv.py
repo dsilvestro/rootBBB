@@ -258,7 +258,7 @@ def get_avg_likelihood(Nobs, fossil_data, est_root, est_sig2, est_q, est_a, gap_
             p1 = np.exp(log_lik_matrix) * (1 - gap_pr)
             p2 = np.ones(len(x_augmented)) * (x_augmented == 0) * gap_pr
             p3 = p1 + p2
-            
+            p3[p3 == 0] = small_number
 
             log_lik_matrix = np.log(p3)
             # print(p2)
