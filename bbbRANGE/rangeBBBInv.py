@@ -456,8 +456,9 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
     
         if iteration % args.p == 0 and verbose:
             if iteration == 0:
-                print("%s\t%s\t%s\t%s\t%s\t%s\t%s" % ("it", "lik", "root", "ext", "sig2", "q_rate", "q_slope"))
-            print("%s\t%s\t%s\t%s\t%s\t%s\t%s" % (iteration, round(lik_A,2), round(est_root_A,2), round(est_ext_A,2), round(est_sig2_A,2), round(est_q_A,5), round(est_a_A,5)))
+                print("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % ("it", "lik", "root", "ext", "sig2", "q_rate", "q_slope","q_gap"))
+            print("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % (iteration, round(lik_A,2), round(est_root_A,2), round(est_ext_A,2), round(est_sig2_A,2), 
+            round(est_q_A,5), round(est_a_A,5), round(gap_pr_A, 3)))
         
         if iteration % args.s == 0:
             if save_mcmc_samples:
