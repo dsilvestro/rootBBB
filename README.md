@@ -1,7 +1,6 @@
 ## Root age estimation using a Bayesian Brownian bridge
 
-The BBB model implemented in this program is described in the upcoming paper _"Fossil data support a pre-Cretaceous origin of flowering plants"_ by 
-Daniele Silvestro, Christine D. Bacon, Wenna Ding, Qiuyue Zhang, Philip C. J. Donoghue, Alexandre Antonelli, and Yaowu Xing.
+The BBB models implemented in this program are described in Silvestro et al. 2021 [Nature Ecology and Evolution](https://doi.org/10.1038/s41559-020-01387-8) and Carlisle et al. 2023 [Curreny Biology](https://doi.org/10.1016/j.cub.2023.06.016). 
 
 
 ### Requirements
