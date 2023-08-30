@@ -33,7 +33,7 @@ python rootBBB.py -sim 10 -seed 9600 -sim_extinct 1
 ```
 The simulated dataset(s) will be analyzed using the MCMC algorithm implemented in the program. You can specify the number of iterations, sampling frequency and print frequency using the `-n`, `-s`, and `-p` commands, respectively (default: `-n 25000 -s 100 -p 1000`). 
 
-The BBB model includes two flavors of preservation models with constant or time-increasing rate. To run the analysis using the latter you can use the `-q_var 1` setting: 
+**The BBB model includes two flavors of preservation models** with constant or time-increasing rate. To run the analysis using the latter you can use the `-q_var 1` setting: 
 
 ```
 python rootBBB.py -sim 10 -seed 9600 -q_var 1
