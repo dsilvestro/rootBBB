@@ -34,6 +34,8 @@ p.add_argument('-DAbatch',  type=int,   help='DA batch size (if set to 0: auto-t
 p.add_argument('-ws',       type=float, help='win sizes root, sig2, q', default = [10,1.25,1.25], nargs=3)
 p.add_argument('-max_age',  type=int,   help='Max boundary of uniform prior on the root age', default = 300)
 p.add_argument('-q_prior',  type=float,   help='shape and rate (default: 1.1, 1)', default = [1.1, 1], nargs=2)
+p.add_argument('-a_prior',  type=float,   help='shape and rate (default: 1, 0.01)', default = [1, 0.01], nargs=2)
+p.add_argument('-sig_prior',  type=float,   help='shape and rate (default: 1, 0.1)', default = [1, 0.1], nargs=2)
 p.add_argument('-q_min',    type=float,   help='offset for q', default = 0)
 
 
@@ -67,6 +69,10 @@ if DAbatch == 0:
     DAbatch += n_DA_samples
 q_var_model = args.q_var
 [alpha_q, beta_q] = args.q_prior
+[alpha_a, beta_a] = args.a_prior
+[alpha_sig, beta_sig] = args.sig_prior
+
+
 q_offset = args.q_min
 
 # simulation settings
@@ -258,6 +264,8 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
     print("\n\nInitializing the model...")
     while np.isnan(lik_A):
         est_a_A = 0.
+        if alpha_a > 1:
+            est_a_A = small_number
         est_ext_A = 0. # ext age multiplier of age_youngest_obs_occ \in (0, 1)
         if Nobs == 0:
             est_ext_A = np.random.uniform(age_youngest_obs_occ,0) 
@@ -283,7 +291,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             else:
                 lik_A, DA_counts = get_avg_likelihood(Nobs, x, est_root_A, np.exp(est_sig2_A), est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
                 #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
-                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=alpha_q,b=beta_q) + gamma_pdf(est_a_A,1,0.01) 
+                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=alpha_sig,b=beta_sig) + gamma_pdf(est_q_A,a=alpha_q,b=beta_q) + gamma_pdf(est_a_A,a=alpha_a, b=beta_a) 
         elif tries <= 200:
             # print("Attempt 2...")
             # init root age
@@ -303,7 +311,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             else:
                 lik_A, DA_counts = get_avg_likelihood(Nobs, x, est_root_A, np.exp(est_sig2_A), est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
                 #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
-                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=alpha_q,b=beta_q) + gamma_pdf(est_a_A,1,0.01) 
+                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=alpha_sig,b=beta_sig) + gamma_pdf(est_q_A,a=alpha_q,b=beta_q) + gamma_pdf(est_a_A,a=alpha_a, b=beta_a) 
         elif tries <= 10000:
             # print("Attempt 3...")
             est_root_A =  np.min([age_oldest_obs_occ*(1+np.random.uniform(0.05,1 )), max_age])
@@ -322,7 +330,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             else:
                 lik_A, DA_counts = get_avg_likelihood(Nobs, x, est_root_A, np.exp(est_sig2_A), est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
                 #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
-                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=1.,b=.1) + gamma_pdf(est_q_A,a=alpha_q,b=beta_q) + gamma_pdf(est_a_A,1,0.01) 
+                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=alpha_sig,b=beta_sig) + gamma_pdf(est_q_A,a=alpha_q,b=beta_q) + gamma_pdf(est_a_A,a=alpha_a, b=beta_a) 
         else:
             sys.exit("Failed to initialize model.")
         tries+=1
@@ -395,7 +403,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
         
         lik, DA_counts = get_avg_likelihood(Nobs, x, est_root, np.exp(est_sig2), est_q, est_a, x_augmented, simTraj_all )
         
-        prior = gamma_pdf(np.exp(est_sig2-log_Nobs),a=1.,b=0.1) + gamma_pdf(est_q,a=alpha_q,b=beta_q) + gamma_pdf(est_a,1,0.01) 
+        prior = gamma_pdf(np.exp(est_sig2-log_Nobs),a=alpha_sig,b=beta_sig) + gamma_pdf(est_q,a=alpha_q,b=beta_q) + gamma_pdf(est_a,a=alpha_a, b=beta_a) 
     
         if (lik-lik_A) + (prior-prior_A) + (h1+h2+h3) >= np.log(np.random.random()) or accept==1 and np.isfinite(lik):
             est_root_A = est_root
