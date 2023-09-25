@@ -353,7 +353,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             out_name = "%s/%s_mcmc_%s_f%s%s%s.log" % (args.outpath, sim_n, seed, freq_par_updates, args.out, model_out)
             print("Writing output to:", out_name)
             logfile = open(out_name, "w") 
-            text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\text_obs\tDA_counts\troot_est\text_est\tq_est\t\ta_est\tsig2_est"
+            text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\text_obs\tDA_counts\troot_est\text_est\tq_est\ta_est\tsig2_est"
             logfile.writelines(text_str)
             
     res = np.zeros((int(args.n/args.s), 5))
