@@ -31,6 +31,7 @@ p.add_argument('-f',        type=float, help='freq. DA runs with updates', defau
 p.add_argument('-out',      type=str,   help='add string to output', default = "")
 p.add_argument('-nDA',      type=int,   help='DA samples', default = 1000)
 p.add_argument('-DAbatch',  type=int,   help='DA batch size (if set to 0: auto-tune)', default = 0)
+p.add_argument('-minDAfrac',  type=float,   help='DA batch size (if set to 0: auto-tune)', default = 0)
 p.add_argument('-ws',       type=float, help='win sizes root, sig2, q', default = [10,1.25,1.25], nargs=3)
 p.add_argument('-max_age',  type=int,   help='Max boundary of uniform prior on the root age', default = 300)
 p.add_argument('-q_prior',  type=float,   help='shape and rate (default: 1.1, 1)', default = [1.1, 1], nargs=2)
@@ -47,6 +48,26 @@ Clade age estimator using a Bayesian Brownian bridge.
 """)
 
 
+        
+def degrade_record_uniform(x, p=0.25):
+    # keep 25% of the records
+    return np.random.binomial(x.astype(int), p)
+
+def degrade_record_exp(x, p=-0.05):
+        # exponential decline in sampling rate
+        degrade = np.exp(p * np.arange(len(x))) 
+        return np.random.binomial(x.astype(int), degrade)
+ 
+def degrade_record_truncation(x, p=50):      
+        # data truncation: gap in the most recent 50 myr
+        degrade = np.ones(len(x)) 
+        degrade[mid_points[:len(x)] < p] = 0
+        return np.random.binomial(x.astype(int), degrade)
+        
+
+degrade_record = None # replace with e.g. degrade_record_uniform to apply fossil degradation 
+
+
 args = p.parse_args()
 
 if args.seed== -1:
@@ -55,6 +76,8 @@ else:
     seed =args.seed
 np.random.seed(seed)
 small_number = 10e-10
+
+min_DAbatch_fraction = args.minDAfrac
 
 n_simulations = args.sim
 save_mcmc_samples = 1
@@ -234,17 +257,29 @@ def get_avg_likelihood(Nobs, fossil_data, est_root, est_sig2, est_q, est_a, x_au
     if len(x_augmented)==0:
         return -np.inf, 0
     else:
+        # est_q = 9.1699E-5
+        # est_a = 5.9293
         dt = bin_size/100 # rescale time axis to determine the slope of the q-increase
         # print(dt, 1./age_oldest_obs_occ)
         time_vec = np.arange(len(x_augmented)).astype(float)[::-1] 
         time_vec *= dt
-        q_vec = est_q * np.exp(est_a*time_vec)
+        q_vec = est_q * np.exp(est_a * time_vec)
         # print(np.log(q_vec)) #<- with est_a > 0 is highest at the recent
         # print(np.log(est_q))# <- est_q ~ q at the root
         # print(x_augmented)
         # quit()
         
         sampling_prob_vec = np.ones(len(x_augmented))- np.exp(-q_vec)
+        
+        # sampling_prob_vec = np.exp(np.log(est_q) - est_a * time_vec)[::-1]
+        # sampling_prob_vec[sampling_prob_vec > 1] = 1
+        
+        # print(simTraj_all[0])
+        # print(x_augmented)
+        # print(sampling_prob_vec, sampling_prob_vec[-1], sampling_prob_vec[0])
+        # quit()
+        #      
+        
         # print(np.log(sampling_prob_vec))
         lik_matrix = binomial_pmf(x_augmented,simTraj_all,sampling_prob_vec)
         # lik_avg = np.log(np.mean(np.exp( np.sum(lik_matrix,axis=1) )))
@@ -404,17 +439,21 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
         lik, DA_counts = get_avg_likelihood(Nobs, x, est_root, np.exp(est_sig2), est_q, est_a, x_augmented, simTraj_all )
         
         prior = gamma_pdf(np.exp(est_sig2-log_Nobs),a=alpha_sig,b=beta_sig) + gamma_pdf(est_q,a=alpha_q,b=beta_q) + gamma_pdf(est_a,a=alpha_a, b=beta_a) 
-    
+        
+
         if (lik-lik_A) + (prior-prior_A) + (h1+h2+h3) >= np.log(np.random.random()) or accept==1 and np.isfinite(lik):
-            est_root_A = est_root
-            est_ext_A = est_ext
-            est_sig2_A = est_sig2
-            est_q_A    = est_q
-            est_a_A    = est_a
-            lik_A      = lik
-            prior_A    = prior
-            x_augmented_A, simTraj_all_A = x_augmented, simTraj_all 
-            accepted = 1
+            if DA_counts > min_DAbatch_fraction * DAbatch or iteration < 100:
+                # print(DA_counts, min_DAbatch_fraction * DAbatch, min_DAbatch_fraction, DAbatch)
+                est_root_A = est_root
+                est_ext_A = est_ext
+                est_sig2_A = est_sig2
+                est_q_A    = est_q
+                est_a_A    = est_a
+                lik_A      = lik
+                prior_A    = prior
+                x_augmented_A, simTraj_all_A = x_augmented, simTraj_all 
+                accepted = 1
+                DA_counts_acc = DA_counts
     
         if iteration % args.p == 0 and verbose:
             if iteration == 0:
@@ -428,10 +467,10 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
                     ( iteration, lik_A+prior_A, lik_A, prior_A, Nobs, np.sum(x), age_oldest_obs_occ, age_youngest_obs_occ, true_root, true_ext, \
                     np.median(true_q), \
                     #true_sig2, DA_counts, age_oldest_obs_occ*(1+est_root_A), est_q_A, est_sig2_A)
-                    true_sig2, DA_counts, est_root_A, est_ext_A, est_q_A, est_a_A, est_sig2_A)
+                    true_sig2, DA_counts_acc, est_root_A, est_ext_A, est_q_A, est_a_A, est_sig2_A)
                 else:
                     text_str = "\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % \
-                    ( iteration, lik_A+prior_A, lik_A, prior_A, Nobs, np.sum(x), age_oldest_obs_occ, age_youngest_obs_occ,DA_counts, est_root_A,est_ext_A, est_q_A, est_a_A, est_sig2_A)
+                    ( iteration, lik_A+prior_A, lik_A, prior_A, Nobs, np.sum(x), age_oldest_obs_occ, age_youngest_obs_occ,DA_counts_acc, est_root_A,est_ext_A, est_q_A, est_a_A, est_sig2_A)
                 logfile.writelines(text_str)
                 logfile.flush()
             
@@ -592,6 +631,9 @@ if run_simulations:
             true_ext = 0
         
         indx_clade_life_span = np.array([i for i in range(len(mid_points)) if mid_points[i] < true_root])
+        
+        if degrade_record is not None:
+            x = degrade_record(x)
         
         if np.sum(x)< 1: 
             print("No fossils:",np.sum(x),"",age_oldest_obs_occ)
