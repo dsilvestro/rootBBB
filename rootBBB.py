@@ -38,6 +38,7 @@ p.add_argument('-q_prior',  type=float,   help='shape and rate (default: 1.1, 1)
 p.add_argument('-a_prior',  type=float,   help='shape and rate (default: 1, 0.01)', default = [1, 0.01], nargs=2)
 p.add_argument('-sig_prior',  type=float,   help='shape and rate (default: 1, 0.1)', default = [1, 0.1], nargs=2)
 p.add_argument('-q_min',    type=float,   help='offset for q', default = 0)
+p.add_argument('-q_prior_distr',    type=str,   help='gamma/normal (log)', default = "gamma")
 
 
 
@@ -94,7 +95,7 @@ q_var_model = args.q_var
 [alpha_q, beta_q] = args.q_prior
 [alpha_a, beta_a] = args.a_prior
 [alpha_sig, beta_sig] = args.sig_prior
-
+PRIOR_DISTR_Q = args.q_prior_distr
 
 q_offset = args.q_min
 
@@ -147,6 +148,12 @@ def gamma_pdf(x,a,b):
 
 def beta_pdf(x,a,b):
     return scipy.stats.beta.logpdf(x,a,b)
+
+def prior_q_rate(x, a, b, distr=PRIOR_DISTR_Q):
+    if distr == "gamma":
+        return gamma_pdf(x,a,b)
+    else:
+        return normal_pdf(np.log(x),a,b)
 
 def update_normal(q,d=1,m=-1,M=1):
     ii = np.random.normal(q,d)
@@ -270,8 +277,10 @@ def get_avg_likelihood(Nobs, fossil_data, est_root, est_sig2, est_q, est_a, x_au
         # quit()
         
         sampling_prob_vec = np.ones(len(x_augmented))- np.exp(-q_vec)
-        
-        # sampling_prob_vec = np.exp(np.log(est_q) - est_a * time_vec)[::-1]
+        # max_delta_q = 100
+        # sampling_prob_vec[sampling_prob_vec > max_delta_q * sampling_prob_vec[-1]] = -1
+        # sampling_prob_vec[sampling_prob_vec == -1] = np.max(sampling_prob_vec)
+        # sampling_prob_vec = np.exp(np.log(est_q) - est_a * time_vec)
         # sampling_prob_vec[sampling_prob_vec > 1] = 1
         
         # print(simTraj_all[0])
@@ -326,7 +335,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             else:
                 lik_A, DA_counts = get_avg_likelihood(Nobs, x, est_root_A, np.exp(est_sig2_A), est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
                 #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
-                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=alpha_sig,b=beta_sig) + gamma_pdf(est_q_A,a=alpha_q,b=beta_q) + gamma_pdf(est_a_A,a=alpha_a, b=beta_a) 
+                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=alpha_sig,b=beta_sig) + prior_q_rate(est_q_A,a=alpha_q,b=beta_q) + gamma_pdf(est_a_A,a=alpha_a, b=beta_a) 
         elif tries <= 200:
             # print("Attempt 2...")
             # init root age
@@ -346,7 +355,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             else:
                 lik_A, DA_counts = get_avg_likelihood(Nobs, x, est_root_A, np.exp(est_sig2_A), est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
                 #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
-                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=alpha_sig,b=beta_sig) + gamma_pdf(est_q_A,a=alpha_q,b=beta_q) + gamma_pdf(est_a_A,a=alpha_a, b=beta_a) 
+                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=alpha_sig,b=beta_sig) + prior_q_rate(est_q_A,a=alpha_q,b=beta_q) + gamma_pdf(est_a_A,a=alpha_a, b=beta_a) 
         elif tries <= 10000:
             # print("Attempt 3...")
             est_root_A =  np.min([age_oldest_obs_occ*(1+np.random.uniform(0.05,1 )), max_age])
@@ -365,7 +374,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             else:
                 lik_A, DA_counts = get_avg_likelihood(Nobs, x, est_root_A, np.exp(est_sig2_A), est_q_A, est_a_A, x_augmented_A, simTraj_all_A)
                 #prior_A = gamma_pdf(est_sig2_A,a=1.,b=1.)
-                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=alpha_sig,b=beta_sig) + gamma_pdf(est_q_A,a=alpha_q,b=beta_q) + gamma_pdf(est_a_A,a=alpha_a, b=beta_a) 
+                prior_A = gamma_pdf(np.exp(est_sig2_A-log_Nobs),a=alpha_sig,b=beta_sig) + prior_q_rate(est_q_A,a=alpha_q,b=beta_q) + gamma_pdf(est_a_A,a=alpha_a, b=beta_a) 
         else:
             sys.exit("Failed to initialize model.")
         tries+=1
@@ -438,9 +447,10 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
         
         lik, DA_counts = get_avg_likelihood(Nobs, x, est_root, np.exp(est_sig2), est_q, est_a, x_augmented, simTraj_all )
         
-        prior = gamma_pdf(np.exp(est_sig2-log_Nobs),a=alpha_sig,b=beta_sig) + gamma_pdf(est_q,a=alpha_q,b=beta_q) + gamma_pdf(est_a,a=alpha_a, b=beta_a) 
+        prior = gamma_pdf(np.exp(est_sig2-log_Nobs),a=alpha_sig,b=beta_sig) + prior_q_rate(est_q,a=alpha_q,b=beta_q) + gamma_pdf(est_a,a=alpha_a, b=beta_a) 
         
-
+        if iteration == 0:
+             DA_counts_acc = DA_counts
         if (lik-lik_A) + (prior-prior_A) + (h1+h2+h3) >= np.log(np.random.random()) or accept==1 and np.isfinite(lik):
             if DA_counts > min_DAbatch_fraction * DAbatch or iteration < 100:
                 # print(DA_counts, min_DAbatch_fraction * DAbatch, min_DAbatch_fraction, DAbatch)
