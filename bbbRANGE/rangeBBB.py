@@ -37,9 +37,12 @@ p.add_argument('-ws',       type=float, help='win sizes root, sig2, q', default 
 p.add_argument('-max_age',  type=int,   help='Max boundary of uniform prior on the root age', default = 300)
 p.add_argument('-q_prior',  type=float,   help='shape and rate (default: 1.1, 1)', default = [1.1, 1], nargs=2)
 p.add_argument('-q_min',    type=float,   help='offset for q', default = 0)
+p.add_argument('-translate', type=float,  help='shift data (if truncated)', default = 0)
 p.add_argument('-debug', type=int,  help='1: debug mode', default = 0)
+p.add_argument('-reset_extant',   type=int,   help='reset n. extant', default = None)
 
 
+min_DAbatch_fraction = 0.
 
 print("""
 
@@ -413,17 +416,22 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
         lik, DA_counts = get_avg_likelihood(Nobs, x, est_root, np.exp(est_sig2), est_q, est_a, x_augmented, simTraj_all )
         
         prior = gamma_pdf(np.exp(est_sig2-log_Nobs),a=1.,b=0.1) + gamma_pdf(est_q,a=alpha_q,b=beta_q) + gamma_pdf(est_a,1,0.01) 
+        
+        if iteration == 0:
+            DA_counts_acc = DA_counts + 0
     
         if (lik-lik_A) + (prior-prior_A) + (h1+h2+h3) >= np.log(np.random.random()) or accept==1 and np.isfinite(lik):
-            est_root_A = est_root
-            est_ext_A = est_ext
-            est_sig2_A = est_sig2
-            est_q_A    = est_q
-            est_a_A    = est_a
-            lik_A      = lik
-            prior_A    = prior
-            x_augmented_A, simTraj_all_A = x_augmented, simTraj_all 
-            accepted = 1
+            if DA_counts > min_DAbatch_fraction * DAbatch or iteration < 100:
+                est_root_A = est_root
+                est_ext_A = est_ext
+                est_sig2_A = est_sig2
+                est_q_A    = est_q
+                est_a_A    = est_a
+                lik_A      = lik
+                prior_A    = prior
+                x_augmented_A, simTraj_all_A = x_augmented, simTraj_all 
+                accepted = 1
+                DA_counts_acc = DA_counts + 0
     
         if iteration % args.p == 0 and verbose:
             if iteration == 0:
@@ -437,7 +445,7 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
                     ( iteration, lik_A+prior_A, lik_A, prior_A, Nobs, np.sum(x), age_oldest_obs_occ, age_youngest_obs_occ, true_root, true_ext, \
                     np.median(true_q), \
                     #true_sig2, DA_counts, age_oldest_obs_occ*(1+est_root_A), est_q_A, est_sig2_A)
-                    true_sig2, DA_counts, est_root_A, est_ext_A, est_q_A, est_a_A, est_sig2_A)
+                    true_sig2, DA_counts_acc, est_root_A, est_ext_A, est_q_A, est_a_A, est_sig2_A)
                 else:
                     text_str = "\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % \
                     ( iteration, lik_A+prior_A, lik_A, prior_A, Nobs, np.sum(x), age_oldest_obs_occ, age_youngest_obs_occ,DA_counts, est_root_A,est_ext_A, est_q_A, est_a_A, est_sig2_A)
@@ -627,7 +635,7 @@ if __name__ == '__main__':
                 
                     plt.plot(np.zeros(int(Nobs)),np.arange(Nobs), 'ro')
                 
-                    title = "n. extant species: %s   n. fossils: %s   $\sigma^{2} = 10^{%s}$   $q_{avg} = 10^{%s}$" % \
+                    title = "n. extant species: %s   n. fossils: %s   $sigma^{2} = 10^{%s}$   $q_{avg} = 10^{%s}$" % \
                     (int(Nobs), int(np.sum(x)), np.round(np.log10(true_sig2),2), np.round(np.log10(np.mean(true_q)),2))
                     plt.gca().set_title(title,  fontsize=16)
                     plt.xlabel('Time',  fontsize=14)
@@ -941,22 +949,36 @@ if __name__ == '__main__':
             mid_points = np.linspace(0,2*max_age,int(2*max_age/BIN_SIZE)+1)
             bin_size = np.abs(np.diff(mid_points)[0])
             
-            range_through_traj = getDT_equalbin(mid_points, tbl["fad"].to_numpy(), tbl["lad"].to_numpy())
-            fossil_count = get_fossil_count(mid_points, tbl["fad"].to_numpy(), tbl["lad"].to_numpy())
+            lad = tbl["lad"].to_numpy()
+            fad = tbl["fad"].to_numpy()
+            if args.translate > 0:
+                lad = lad - args.translate
+                fad = fad - args.translate
+            
+            if args.reset_extant is not None:
+                present_div = args.reset_extant
+            else:
+                present_div = tbl['n_extant'][0]
+                
+            
+            
+            range_through_traj = getDT_equalbin(mid_points, fad, lad)
+            fossil_count = get_fossil_count(mid_points, fad, lad)
             # print("np.sum(res['fossil_count'])", np.sum(fossil_count), fossil_count)
             
             
             if tbl["n_extant"][0] > 0:
                 age_youngest_obs_occ = 0
             else:
-                age_youngest_obs_occ = np.min(tbl["lad"])
+                age_youngest_obs_occ = np.min(lad)
            
-            print("age oldest occ:", np.max(tbl["fad"]))
+            print("age oldest occ:", np.max(fad))
             print("age youngest occ:", age_youngest_obs_occ)
-            print("present diversity:", tbl['n_extant'][0])
+            print("present diversity:", present_div)
             if DEBUG:
                 print("fossils:\n", fossil_count)
                 print("range_through_traj:\n", range_through_traj)
+                print(list(range_through_traj))
             
             max_obs_ind = np.max(np.where(fossil_count > 0)[0]) + 1
             x = fossil_count[:max_obs_ind]
@@ -967,11 +989,11 @@ if __name__ == '__main__':
             input_file_raw = os.path.basename(args.fadlad_data)
             clade_name = os.path.splitext(input_file_raw)[0]  # file name without extension
     
-            bbb_res=run_mcmc(age_oldest_obs_occ=np.max(tbl["fad"]), 
+            bbb_res=run_mcmc(age_oldest_obs_occ=np.max(fad), 
                              age_youngest_obs_occ=age_youngest_obs_occ, 
                              x=x, # fossil data (fad/lad)
-                             log_Nobs=np.log(np.max([1, tbl['n_extant'][0]])), 
-                             Nobs=tbl['n_extant'][0], 
+                             log_Nobs=np.log(np.max([1, present_div])), 
+                             Nobs=present_div, 
                              bbb_condition=bbb_condition,
                              sim_n=clade_name
                              )
