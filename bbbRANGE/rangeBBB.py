@@ -671,7 +671,8 @@ if __name__ == '__main__':
             # quit()
 
     elif run_range_simulations:
-        from bd_sim import *
+        # from bd_sim import *
+        from bd_simulator import *
         from fossil_sim import *
         print("seed",seed)
         init_seed = seed + 0
@@ -682,9 +683,9 @@ if __name__ == '__main__':
         mid_points = np.linspace(0,2*max_age,int(2*max_age/BIN_SIZE)+1)
         bin_size = np.abs(np.diff(mid_points)[0])
         
-        max_true_root_age = 100
-        min_true_root_age = 30
-        root_age_range = np.array([max_true_root_age, min_true_root_age])
+        # max_true_root_age = 200
+        # min_true_root_age = 100
+        # root_age_range = np.array([max_true_root_age, min_true_root_age])
         n_sp_range = np.array([2000, 20000])
         avg_n_q_rate_shifts=100 # if =0 -> constant preservation
         rangeL = [0.1, 1]
@@ -692,9 +693,13 @@ if __name__ == '__main__':
         q_range = np.array([0.0001, 0.01]) + q_offset
         q_log_mean_sd = np.array([np.log(0.01), 0.5])
         print_ltt = True
-        # if DEBUG:
-        #     print_ltt = True
+        if DEBUG:
+             print_ltt = True
         #---------------------------#
+        if simulate_extinct:
+            EXTANT = 0
+        else:
+            EXTANT = None
     
         sim_number = 1
         counter = 0
@@ -702,15 +707,49 @@ if __name__ == '__main__':
             counter += 1
             print(counter, sim_number)
         
-            ts, te = run_sim(#root_age=root_age,
-                             root_r=root_age_range,    
-                             rangeSP=n_sp_range,
-                             rangeL=rangeL,
-                             rangeM=rangeM,
-                             print_ltt=print_ltt,
-                             poiL = 10,
-                             poiM = 10,
-                            )
+            # ts, te = run_sim(#root_age=root_age,
+            #                  root_r=root_age_range,
+            #                  rangeSP=n_sp_range,
+            #                  rangeL=rangeL,
+            #                  rangeM=rangeM,
+            #                  print_ltt=print_ltt,
+            #                  poiL = 10,
+            #                  poiM = 10,
+            #                  maxEXTANT=maxEXTANT
+            #                 )
+            
+            # DeepDive simulator
+            bd_obj = bd_simulator(
+                s_species=1,  # number of starting species (can be a range)
+                rangeSP=n_sp_range,  # min/max size data set
+                minEX_SP=0,  # minimum number of extinct lineages allowed
+                pr_extant_clade= EXTANT,
+                root_r=[max_age / 3, max_age],  # range root ages
+                rangeL=rangeL,
+                rangeM=rangeM,
+                scale=100.,
+                p_mass_extinction=[0, 0.001],
+                magnitude_mass_ext=[0.8, 0.95],
+                fixed_mass_extinction=None, # list of ME ages
+                p_mass_speciation=[0, 0.001],
+                magnitude_mass_sp=[0.5, 0.95],
+                poiL=3,
+                poiM=3,
+                p_constant_bd=0.05,
+                p_equilibrium=0.1,
+                p_dd_model=0,
+                dd_K=100,
+                dd_maxL=None, # max speciation rate
+                log_uniform_rates=False,
+                survive_age_condition=None,
+                seed=seed, 
+            )
+            res = bd_obj.run_simulation(print_res=DEBUG)
+            
+            ts = res[:,0].flatten()
+            te = res[:,1].flatten()
+            
+            
                     
             res = generate_bbb_data(ts, te,
                                     bin_size=bin_size,
@@ -721,21 +760,7 @@ if __name__ == '__main__':
                                     avg_n_q_rate_shifts=avg_n_q_rate_shifts, 
                                     freq_zero_preservation=freq_zero_preservation,
                                     debug=DEBUG)
-            # {
-            #         'ts': ts,
-            #         'te': te,
-            #         'n_bins': n_bins,
-            #         'time_bins': time_bins,
-            #         'range_through_traj': range_through_traj,
-            #         'fossil_count': fossil_count,
-            #         'n_extant': len(te[te == 0]),
-            #         'oldest_occ': np.max(tbl),
-            #         'fadlad_tbl': tbl,
-            #         'youngest_occ': np.max(tbl),
-            #         'true_range_through_traj': true_range_through_traj,
-            #         'avg_q': np.mean(q_rates),
-            #         'q_rates': q_rates
-            #     }
+
             if DEBUG: 
                 print('fossil_count', res['fossil_count'])
                 print('range_through_traj', res['range_through_traj'])

@@ -148,6 +148,7 @@ def run_sim(sim=0,
             s_species=1,   # number of starting species
             rangeSP=[50, 300],     # min/max size data set
             minEX_SP=0,    # minimum number of extinct lineages allowed
+            maxEXTANT=None,
             # SETTINGS for BD-SHIFT SIMULATIONS
             root_age = None,
             shift_speciation = [20],      # specify times of rate shifts (speciation)
@@ -181,9 +182,12 @@ def run_sim(sim=0,
     [minSP, maxSP] = rangeSP
     i=0
     LOtrue,i=[0],0
-    n_extinct=-0
-    while len(LOtrue) < minSP or len(LOtrue) > maxSP or n_extinct < minEX_SP: 
-        #print len(LOtrue),n_extinct
+    n_extinct = 0
+    n_extant = 0
+    if maxEXTANT is None:
+        maxEXTANT = np.inf
+    while len(LOtrue) < minSP or len(LOtrue) > maxSP or n_extinct < minEX_SP or n_extant >= maxEXTANT: 
+        print(len(LOtrue), n_extinct, n_extant, maxEXTANT)
         if i > 100: 
             i = 0
             clade = 0
@@ -214,6 +218,7 @@ def run_sim(sim=0,
                 FAtrue,LOtrue=simulate(L,M,timesL,timesM,root,scale,s_species, maxSP)
     
         n_extinct = len(LOtrue[LOtrue>0])
+        n_extant = len(LOtrue[LOtrue==0])
     print("\nSim %s:" % (sim))
     print("L", L, "M",M, "tL",timesL,"tM",timesM)
     print(len(LOtrue),len(L),len(M))
