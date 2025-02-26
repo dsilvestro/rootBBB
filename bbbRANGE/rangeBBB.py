@@ -680,11 +680,13 @@ if __name__ == '__main__':
     
         #-- simulation parameters --#
         BIN_SIZE = 1
-        mid_points = np.linspace(0,2*max_age,int(2*max_age/BIN_SIZE)+1)
+        mid_points = np.linspace(0,2 * max_age, int(2*max_age/BIN_SIZE)+1)
         bin_size = np.abs(np.diff(mid_points)[0])
         
-        # max_true_root_age = 200
-        # min_true_root_age = 100
+        max_true_root_age = 100
+        min_true_root_age = 30
+        # max_true_root_age = max_age + 0
+        # max_true_root_age = max_age / 3  # range root ages
         # root_age_range = np.array([max_true_root_age, min_true_root_age])
         n_sp_range = np.array([2000, 20000])
         avg_n_q_rate_shifts=100 # if =0 -> constant preservation
@@ -724,7 +726,7 @@ if __name__ == '__main__':
                 rangeSP=n_sp_range,  # min/max size data set
                 minEX_SP=0,  # minimum number of extinct lineages allowed
                 pr_extant_clade= EXTANT,
-                root_r=[max_age / 3, max_age],  # range root ages
+                root_r=[max_true_root_age, min_true_root_age],  # range root ages
                 rangeL=rangeL,
                 rangeM=rangeM,
                 scale=100.,
