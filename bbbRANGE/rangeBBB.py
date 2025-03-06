@@ -20,7 +20,8 @@ p.add_argument('-plot',     type=int,   help='plot simulated Brownian bridge', d
 p.add_argument('-seed',     type=int,   help='random seed', default = -1)
 p.add_argument('-verbose',  type=int,   help='verbose', default = 1)
 p.add_argument('-sim',      type=int,   help='if >1 run simulations', default = 0)
-p.add_argument('-sim_extinct', type=int,  help='0: simulate extant clades; 1: simulate extinct clades', default = 0)
+p.add_argument('-sim_extinct', type=int,  help='1: simulate only extinct clades', default = 0)
+p.add_argument('-sim_extant', type=int,  help='1: simulate only extant clades', default = 0)
 p.add_argument('-sim_range', type=int,  help='1: simulate range data', default = 0)
 p.add_argument('-biased_q', type=int,   help='if 1 set increasing q through time', default = 0)
 p.add_argument('-freq_q0',  type=float, help='frequency of 0-sampling rate', default = 0.1)
@@ -81,6 +82,7 @@ freq_zero_preservation = args.freq_q0
 bias_exp = args.q_exp
 
 simulate_extinct = args.sim_extinct
+simulate_extant = args.sim_extant
 run_range_simulations = args.sim_range
 
 run_simulations = np.min([1,n_simulations])
@@ -700,9 +702,11 @@ if __name__ == '__main__':
         #---------------------------#
         if simulate_extinct:
             EXTANT = 0
+        elif simulate_extant:
+            EXTANT = 1
         else:
             EXTANT = None
-    
+        survive_age_condition = None    
         sim_number = 1
         counter = 0
         while sim_number <= n_simulations:
@@ -719,6 +723,7 @@ if __name__ == '__main__':
             #                  poiM = 10,
             #                  maxEXTANT=maxEXTANT
             #                 )
+            
             
             # DeepDive simulator
             bd_obj = bd_simulator(
@@ -743,7 +748,7 @@ if __name__ == '__main__':
                 dd_K=100,
                 dd_maxL=None, # max speciation rate
                 log_uniform_rates=False,
-                survive_age_condition=None,
+                survive_age_condition=survive_age_condition,
                 seed=seed, 
             )
             res = bd_obj.run_simulation(print_res=DEBUG)
