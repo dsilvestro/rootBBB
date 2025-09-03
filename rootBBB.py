@@ -390,13 +390,13 @@ def run_mcmc(age_oldest_obs_occ, age_youngest_obs_occ, x, log_Nobs, Nobs, sim_n 
             
         if run_simulations:
             out_name = "%s/mcmc_%s_%s_f%s%s%s.log" % (args.outpath, sim_n, seed, freq_par_updates, args.out, model_out)
-            logfile = open(out_name, "w") 
+            logfile = open(out_name, "w", newline='') 
             text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\text_obs\troot_true\text_true\tq_med_true\tsig2_true\tDA_counts\troot_est\text_est\tq_est\ta_est\tsig2_est"
             logfile.writelines(text_str)
         else:
             out_name = "%s/%s_mcmc_%s_f%s%s%s.log" % (args.outpath, sim_n, seed, freq_par_updates, args.out, model_out)
             print("Writing output to:", out_name)
-            logfile = open(out_name, "w") 
+            logfile = open(out_name, "w", newline='') 
             text_str = "iteration\tposterior\tlikelihood\tprior\tNobs\tNfossils\troot_obs\text_obs\tDA_counts\troot_est\text_est\tq_est\ta_est\tsig2_est"
             logfile.writelines(text_str)
             
@@ -616,7 +616,7 @@ if run_simulations:
     save_summary = 1
     if save_summary:
         out_name = "%s/summary.txt" % (args.outpath)
-        logfile = open(out_name, "w") 
+        logfile = open(out_name, "w", newline='') 
         text_str = "iteration\tNobs\tNfossils\troot_true\troot_obs\tq_med_true\tsig2_true\troot_est\troot_M\troot_m\tq_est\tsig2_est"
         logfile.writelines(text_str)
 
@@ -652,7 +652,7 @@ if run_simulations:
         else:
             if args.plot:
                 mid_points_temp = mid_points[indx_clade_life_span]
-                print("\n\nPLOTTING")
+                # print("\n\nPLOTTING")
                 print(x)
                 print(indx_clade_life_span)
                 print(len(x), len(mid_points_temp), len(mid_points), len(Ntrue.T))
@@ -668,7 +668,7 @@ if run_simulations:
                 
                 plt.plot(np.zeros(int(Nobs)),np.arange(Nobs), 'ro')
                 
-                title = "n. extant species: %s   n. fossils: %s   $\sigma^{2} = 10^{%s}$   $q_{avg} = 10^{%s}$" % \
+                title = "n. extant species: %s   n. fossils: %s   $sigma^{2} = 10^{%s}$   $q_{avg} = 10^{%s}$" % \
                 (int(Nobs), int(np.sum(x)), np.round(np.log10(true_sig2),2), np.round(np.log10(np.mean(true_q)),2))
                 plt.gca().set_title(title,  fontsize=16)
                 plt.xlabel('Time',  fontsize=14)
@@ -729,7 +729,7 @@ else:
     for taxon in taxa_list:
         print("\nParsing data...", taxon)
     
-        Nobs = int(diversity_table[diversity_table[:,0]==taxon,1])
+        Nobs = int(diversity_table[diversity_table[:,0]==taxon,1][0])
 
         taxon_indx = np.where(taxa_names==taxon)[0][0]
         x= fossil_data[:,taxon_indx]
